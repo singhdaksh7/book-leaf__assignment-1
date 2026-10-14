@@ -30,7 +30,7 @@ export const KB_CHUNKS: readonly KbChunk[] = [
   },
   {
     id: "kb.royalty-policy", topic: "Royalty Policy", kind: "policy", categories: ["ROYALTY_PAYMENTS"],
-    keywords: ["royalt", "payout", "payment", "paid", "pay ", "bank", "transfer", "quarter", "net profit", "commission", "threshold", "rollover", "earn", "80/20", "split", "breakdown", "money", "amount"],
+    keywords: ["royalt", "payout", "payment", "paid", "pay ", "bank", "transfer", "quarter", "net profit", "commission", "threshold", "rollover", "earn", "80/20", "split", "breakdown", "money", "amount", "रॉयल्टी", "भुगतान", "पैसा", "paisa", "bhugtan"],
     content: [
       "BookLeaf follows an 80/20 royalty split: 80% of the net profit per book goes to the author, 20% to BookLeaf.",
       "Net profit = MRP minus printing cost, platform commission (Amazon/Flipkart), and shipping charges.",
@@ -42,7 +42,7 @@ export const KB_CHUNKS: readonly KbChunk[] = [
   },
   {
     id: "kb.isbn-policy", topic: "ISBN Policy", kind: "policy", categories: ["ISBN_METADATA"],
-    keywords: ["isbn", "imprint", "metadata", "duplicate", "wrong book", "barcode", "description", "title change", "listing details", "cover price"],
+    keywords: ["isbn", "imprint", "metadata", "duplicate", "wrong book", "barcode", "description", "title change", "listing details", "cover price", "आईएसबीएन"],
     content: [
       "Every book published through BookLeaf receives a unique ISBN assigned by BookLeaf.",
       "ISBNs are registered under BookLeaf's publisher imprint. If an author wants an ISBN under their own imprint, they need to obtain it independently.",
@@ -51,7 +51,7 @@ export const KB_CHUNKS: readonly KbChunk[] = [
   },
   {
     id: "kb.printing-quality", topic: "Printing & Quality", kind: "policy", categories: ["PRINTING_QUALITY"],
-    keywords: ["print", "quality", "misprint", "binding", "blurry", "misaligned", "colo", "defect", "reprint", "damaged", "torn", "author cop", "turnaround", "paper", "faded"],
+    keywords: ["print", "quality", "misprint", "binding", "blurry", "misaligned", "colo", "defect", "reprint", "damaged", "torn", "author cop", "turnaround", "paper", "faded", "प्रिंट", "छपाई"],
     content: [
       "In-house printing handles most orders. Overflow or specific format requirements go to Repro India or Epitome Books.",
       "Standard print turnaround: 5–7 business days from order confirmation.",
@@ -60,7 +60,7 @@ export const KB_CHUNKS: readonly KbChunk[] = [
   },
   {
     id: "kb.distribution-availability", topic: "Distribution & Availability", kind: "policy", categories: ["DISTRIBUTION_AVAILABILITY"],
-    keywords: ["amazon", "flipkart", "listing", "listed", "unavailable", "out of stock", "stock", "not showing", "available", "store", "distribut", "platform", "go live", "sync", "buy"],
+    keywords: ["amazon", "flipkart", "listing", "listed", "unavailable", "out of stock", "stock", "not showing", "available", "store", "distribut", "platform", "go live", "sync", "buy", "अमेज़न", "उपलब्ध नहीं"],
     content: [
       "Books are listed on Amazon India, Flipkart, Amazon US, Amazon UK, and the BookLeaf Store.",
       "New listings typically go live within 7–10 business days after publication is complete.",
@@ -69,7 +69,7 @@ export const KB_CHUNKS: readonly KbChunk[] = [
   },
   {
     id: "kb.production-stages", topic: "Production Stages", kind: "policy", categories: ["BOOK_STATUS_PRODUCTION"],
-    keywords: ["status", "stage", "production", "typesetting", "proofread", "proof", "editing", "manuscript", "cover design", "delay", "when will", "how long", "progress", "update", "weeks", "approval", "revision"],
+    keywords: ["status", "stage", "production", "typesetting", "proofread", "proof", "editing", "manuscript", "cover design", "delay", "when will", "how long", "progress", "update", "weeks", "approval", "revision", "कब तक", "प्रकाशित"],
     content: [
       "A book goes through the following stages: Manuscript Received → Editing (if opted) → Cover Design → Typesetting → Proofreading → ISBN Assignment → Printing → Distribution Setup → Published & Live.",
       "Authors are updated at each stage via email. Delays typically happen at Cover Design (waiting for author approval) and Proofreading (revision rounds)."

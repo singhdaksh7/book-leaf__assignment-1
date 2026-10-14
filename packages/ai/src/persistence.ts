@@ -63,9 +63,11 @@ export type RetryAdvice =
   | "after-config";
 
 const TRANSIENT: ReadonlySet<AiErrorCode> = new Set(["AI_TIMEOUT", "AI_RATE_LIMITED", "AI_PROVIDER_ERROR", "AI_NETWORK_ERROR"]);
+// A crashed worker says nothing about the model, so one later retry is appropriate.
+const RETRY_LATER: ReadonlySet<AiErrorCode> = new Set([...TRANSIENT, "AI_ATTEMPT_ABANDONED"]);
 
 export function retryAdviceFor(code: AiErrorCode): RetryAdvice {
-  if (TRANSIENT.has(code)) return "later";
+  if (RETRY_LATER.has(code)) return "later";
   if (code === "AI_NOT_CONFIGURED") return "after-config";
   return "manual";
 }

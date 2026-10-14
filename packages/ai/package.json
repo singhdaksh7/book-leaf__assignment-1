@@ -9,7 +9,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "verify:package": "npm run build && node scripts/verify-package.mjs"
   },
   "dependencies": { "@bookleaf/contracts": "file:../contracts", "zod": "^3.24.2" },
   "devDependencies": { "@types/node": "^22.10.0", "vitest": "^3.0.8" }

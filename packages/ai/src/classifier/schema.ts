@@ -13,7 +13,10 @@ export const modelClassificationSchema = z.object({
 export type ModelClassification = z.infer<typeof modelClassificationSchema>;
 
 /** Models sometimes wrap JSON in prose or code fences; accept only a single top-level object. */
+const MAX_OUTPUT_CHARS = 20_000;
+
 export function extractJsonObject(raw: string): unknown {
+  if (raw.length > MAX_OUTPUT_CHARS) throw new AiUnavailableError("AI returned oversized output", "AI_INVALID_OUTPUT");
   const trimmed = raw.trim();
   const candidates = [trimmed];
   const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(trimmed);

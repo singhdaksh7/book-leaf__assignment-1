@@ -1,6 +1,7 @@
 import { CATEGORY_LABELS, maxPriority, type TicketCategory, type TicketPriority } from "../categories.js";
 import { AiUnavailableError, type AiErrorCode } from "../errors.js";
 import { findUnsupportedClaims, type GroundingIssue } from "../grounding.js";
+import { findUnsafeMarkup } from "../grounding-strict.js";
 import { createKnowledgeRetriever, type KnowledgeRetriever, type RetrievedChunk } from "../knowledge/retriever.js";
 import type { LlmProvider } from "../provider/types.js";
 import { detectInjection } from "../safety.js";
@@ -29,6 +30,8 @@ export interface TicketClassification {
   /** Unsupported numbers/dates/completed-action claims removed from the model rationale. */
   groundingIssues: GroundingIssue[];
   usage: UsageRecord | null;
+  /** True when the provider call itself failed (outage, rate limit, malformed envelope), not merely unusable model content. */
+  providerFailed: boolean;
 }
 
 export interface TicketClassifier { classify(input: ClassifyTicketInput): Promise<TicketClassification>; }
@@ -41,7 +44,7 @@ export interface TicketClassifierOptions {
 }
 
 const INJECTION_CONFIDENCE_CAP = 0.6;
-const HEURISTIC_CONFIDENCE = { matched: 0.3, unmatched: 0.15 };
+const HEURISTIC_CONFIDENCE = { matched: 0.3, ambiguous: 0.2, unmatched: 0.15 };
 
 /**
  * Classifies a ticket into one of the six BookLeaf categories and a priority. Never throws for provider or
@@ -60,14 +63,14 @@ export function createTicketClassifier(options: TicketClassifierOptions): Ticket
       const chunkIds = chunks.map((c) => c.id);
       const bookFacts = pickBookFacts(input.bookContext);
 
-      const fallback = (reason: AiErrorCode, spent: UsageRecord | null = null): TicketClassification => {
+      const fallback = (reason: AiErrorCode, spent: UsageRecord | null = null, providerFailed = false): TicketClassification => {
         options.logger?.warn("ai.classifier.fallback", { reason });
         const h = heuristicClassify(`${ticketText}\n${history.map((m) => m.body).join("\n")}`);
         return {
-          category: h.category, priority: h.priority, confidence: h.matched ? HEURISTIC_CONFIDENCE.matched : HEURISTIC_CONFIDENCE.unmatched,
+          category: h.category, priority: h.priority, confidence: !h.matched ? HEURISTIC_CONFIDENCE.unmatched : h.ambiguous ? HEURISTIC_CONFIDENCE.ambiguous : HEURISTIC_CONFIDENCE.matched,
           rationale: "Automatic keyword triage because AI classification was unavailable. Please review.",
           citations: citationsFor(h.category, chunks), retrievedChunkIds: chunkIds, source: "heuristic", fallbackReason: reason,
-          securityFlags, groundingIssues: [], usage: spent
+          securityFlags, groundingIssues: [], usage: spent, providerFailed
         };
       };
 
@@ -76,7 +79,7 @@ export function createTicketClassifier(options: TicketClassifierOptions): Ticket
       try {
         completion = await options.provider.complete({ purpose: "classify", system: prompt.system, user: prompt.user, maxOutputTokens: limits.maxOutputTokens, temperature: 0 });
       } catch (error) {
-        return fallback(error instanceof AiUnavailableError ? error.code : "AI_PROVIDER_ERROR");
+        return fallback(error instanceof AiUnavailableError ? error.code : "AI_PROVIDER_ERROR", null, true);
       }
 
       let parsed;
@@ -89,7 +92,7 @@ export function createTicketClassifier(options: TicketClassifierOptions): Ticket
       const sources = [
         { text: ticketText }, ...history.map((h) => ({ text: h.body })), { text: JSON.stringify(bookFacts) }, ...chunks.map((c) => ({ text: c.content }))
       ];
-      const groundingIssues = findUnsupportedClaims(parsed.rationale, sources);
+      const groundingIssues = [...findUnsupportedClaims(parsed.rationale, sources), ...findUnsafeMarkup(parsed.rationale)];
       const rationale = groundingIssues.length === 0
         ? parsed.rationale
         : `Classified as ${CATEGORY_LABELS[parsed.category]} based on the ticket content. Please review.`;
@@ -97,7 +100,7 @@ export function createTicketClassifier(options: TicketClassifierOptions): Ticket
       const confidence = securityFlags.length > 0 ? Math.min(parsed.confidence, INJECTION_CONFIDENCE_CAP) : parsed.confidence;
       return {
         category: parsed.category, priority: maxPriority(parsed.priority, priorityFloor(parsed.category, ticketText)), confidence,
-        rationale, citations, retrievedChunkIds: chunkIds, source: "model", securityFlags, groundingIssues, usage: completion.usage
+        rationale, citations, retrievedChunkIds: chunkIds, source: "model", securityFlags, groundingIssues, usage: completion.usage, providerFailed: false
       };
     }
   };

@@ -32,6 +32,8 @@ class CallFailure extends AiUnavailableError {
 function failureForStatus(status: number, retryAfterMs: number | undefined): CallFailure {
   if (status === 429) return new CallFailure("AI_RATE_LIMITED", "AI provider rate limit reached", true, retryAfterMs);
   if (status === 408 || status >= 500) return new CallFailure("AI_PROVIDER_ERROR", `AI provider error (${status})`, true, retryAfterMs);
+  // Bad or revoked credentials cannot be fixed by retrying; surface as a configuration problem.
+  if (status === 401 || status === 403) return new CallFailure("AI_NOT_CONFIGURED", "AI provider rejected the credentials", false);
   return new CallFailure("AI_PROVIDER_ERROR", `AI provider rejected the request (${status})`, false);
 }
 
@@ -113,6 +115,8 @@ export class OpenRouterProvider implements LlmProvider {
       if (this.#config.appUrl) headers["HTTP-Referer"] = this.#config.appUrl;
       const response = await this.#fetch(`${this.#config.baseUrl}/chat/completions`, {
         method: "POST", headers, signal: controller.signal,
+        // Never follow redirects: the bearer token must only ever go to the configured host.
+        redirect: "error",
         body: JSON.stringify({
           model, temperature: request.temperature ?? 0,
           max_tokens: Math.min(request.maxOutputTokens ?? this.#config.maxOutputTokens, this.#config.maxOutputTokens),

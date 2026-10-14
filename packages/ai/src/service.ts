@@ -34,8 +34,6 @@ export interface BookLeafAiServiceOptions {
   logger?: AiLogger;
 }
 
-/** If the classification call failed at the provider level, a second model call would just repeat the wait. */
-const PROVIDER_DOWN: ReadonlySet<AiErrorCode> = new Set(["AI_NOT_CONFIGURED", "AI_TIMEOUT", "AI_RATE_LIMITED", "AI_PROVIDER_ERROR", "AI_NETWORK_ERROR"]);
 const FALLBACK_CONFIDENCE_CAP = 0.5;
 
 /**
@@ -58,9 +56,20 @@ export class BookLeafAiService implements AiService {
   }
 
   async analyzeTicketDetailed(input: AnalyzeTicketInput): Promise<AnalysisOutcome> {
+    try {
+      return await this.#analyze(input);
+    } catch (error) {
+      // Provider/output problems never reach here (they become fallbacks). This is a bug or invalid input; the original
+      // message is dropped because it could contain author data.
+      if (error instanceof AiUnavailableError) throw error;
+      throw new AiUnavailableError("AI analysis failed unexpectedly", "AI_INTERNAL_ERROR");
+    }
+  }
+
+  async #analyze(input: AnalyzeTicketInput): Promise<AnalysisOutcome> {
     const classification = await this.#classifier.classify(input);
     // A provider outage was already detected by the classifier: skip the second call and use the policy template.
-    const providerDown = classification.fallbackReason !== undefined && PROVIDER_DOWN.has(classification.fallbackReason);
+    const providerDown = classification.providerFailed;
     const draft = await this.#drafter.draft(input, classification, providerDown ? classification.fallbackReason : undefined);
 
     const draftFellBack = draft.source === "fallback";

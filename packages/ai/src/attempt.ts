@@ -61,3 +61,18 @@ export function worstCaseAnalysisMs(config: Pick<AiConfig, "timeoutMs" | "maxRet
   const models = config.fallbackModel ? 2 : 1;
   return 2 * models * perModel;
 }
+
+/** Extra time beyond the worst case before a PENDING attempt is presumed abandoned (clock skew, queue pickup delay). */
+export const ABANDONED_MARGIN_MS = 30_000;
+
+/**
+ * Recovery guidance for a crashed or restarted worker: a PENDING attempt older than the worst-case run time plus a
+ * margin can no longer complete. The backend should then write `abandonedRow()` onto it (status FAILED,
+ * `AI_ATTEMPT_ABANDONED`, retry advice "later") and may enqueue one new attempt. A younger PENDING attempt must be left
+ * alone (single-flight) so two workers never analyse the same ticket concurrently.
+ */
+export function isPendingAttemptAbandoned(createdAt: Date, config: Parameters<typeof worstCaseAnalysisMs>[0], now: Date = new Date()): boolean {
+  return now.getTime() - createdAt.getTime() > worstCaseAnalysisMs(config) + ABANDONED_MARGIN_MS;
+}
+
+export function abandonedRow(): AiAnalysisRowData { return failedRow("AI_ATTEMPT_ABANDONED"); }

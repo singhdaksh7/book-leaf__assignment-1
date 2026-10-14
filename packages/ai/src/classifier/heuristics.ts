@@ -6,15 +6,15 @@ import { maxPriority, ticketCategories, type TicketCategory, type TicketPriority
  */
 
 const CATEGORY_TERMS: Record<TicketCategory, readonly RegExp[]> = {
-  ROYALTY_PAYMENTS: [/royalt/, /payout/, /\bpaid\b|\bpayment/, /bank (account|transfer|detail)/, /\bearnings?\b/, /net profit/, /quarter/, /\bsold \d+ copies/],
-  ISBN_METADATA: [/\bisbn\b/, /metadata/, /imprint/, /\bbarcode/, /book description|description of my book/, /wrong book/],
-  PRINTING_QUALITY: [/print(ing)? quality|quality of (the )?print/, /misprint/, /binding/, /blurry|misaligned|faded|smudg/, /colou?r/, /reprint/, /defect|damaged|torn/, /author copies/],
-  DISTRIBUTION_AVAILABILITY: [/unavailable|out of stock/, /\bamazon\b|\bflipkart\b/, /not (showing|listed|available)/, /listing|listed/, /\bbookleaf store\b/, /\bsync/],
-  BOOK_STATUS_PRODUCTION: [/typesetting|proofread|proofs?\b/, /cover design/, /\bproduction\b/, /\bmanuscript/, /book status|status of my book/, /when will (it|my book)/, /\bediting\b/],
+  ROYALTY_PAYMENTS: [/royalt/, /payout/, /\bpaid\b|\bpayment/, /bank (account|transfer|detail)/, /\bearnings?\b/, /net profit/, /quarter/, /\bsold \d+ copies/, /रॉयल्टी|भुगतान|\bbhugtan\b|\bpaisa\b|\bpaise\b/],
+  ISBN_METADATA: [/\bisbn\b/, /metadata/, /imprint/, /\bbarcode/, /book description|description of my book/, /wrong book/, /आईएसबीएन/],
+  PRINTING_QUALITY: [/print(ing)? quality|quality of (the )?print/, /misprint/, /binding/, /blurry|misaligned|faded|smudg/, /colou?r/, /reprint/, /defect|damaged|torn/, /author copies/, /प्रिंट|छपाई/],
+  DISTRIBUTION_AVAILABILITY: [/unavailable|out of stock/, /\bamazon\b|\bflipkart\b/, /not (showing|listed|available)/, /listing|listed/, /\bbookleaf store\b/, /\bsync/, /उपलब्ध नहीं|अमेज़न/],
+  BOOK_STATUS_PRODUCTION: [/typesetting|proofread|proofs?\b/, /cover design/, /\bproduction\b/, /\bmanuscript/, /book status|status of my book/, /when will (it|my book)/, /\bediting\b/, /कब तक|प्रकाशित/],
   GENERAL_INQUIRY: []
 };
 
-const ISBN_ERROR = /(duplicate|different|wrong|incorrect|mismatch|doesn'?t match|not matching|another book).{0,60}\bisbn\b|\bisbn\b.{0,80}(duplicate|different|wrong|incorrect|mismatch|doesn'?t match|not matching|another book|error)/;
+const ISBN_ERROR = /आईएसबीएन.{0,40}(गलत|अलग|डुप्लिकेट)|(गलत|अलग|डुप्लिकेट).{0,40}आईएसबीएन|(duplicate|different|wrong|incorrect|mismatch|doesn'?t match|not matching|another book).{0,60}\bisbn\b|\bisbn\b.{0,80}(duplicate|different|wrong|incorrect|mismatch|doesn'?t match|not matching|another book|error)/;
 
 export function scoreCategories(text: string): Array<{ category: TicketCategory; score: number }> {
   const t = text.toLowerCase();
@@ -30,16 +30,16 @@ function monthsMentioned(t: string): number {
   return Number(m[1]) || words[m[1]] || 0;
 }
 
-export function heuristicClassify(text: string): { category: TicketCategory; priority: TicketPriority; matched: boolean } {
+export function heuristicClassify(text: string): { category: TicketCategory; priority: TicketPriority; matched: boolean; /** two categories matched equally well */ ambiguous: boolean } {
   const t = text.toLowerCase();
-  const [top] = scoreCategories(t);
+  const [top, second] = scoreCategories(t);
   // ISBN errors outrank loose royalty/distribution mentions ("ISBN on Amazon").
   const category: TicketCategory = ISBN_ERROR.test(t) ? "ISBN_METADATA" : top && top.score > 0 ? top.category : "GENERAL_INQUIRY";
-  return { category, priority: policyPriority(category, t), matched: category !== "GENERAL_INQUIRY" };
+  return { category, priority: policyPriority(category, t), matched: category !== "GENERAL_INQUIRY", ambiguous: category !== "ISBN_METADATA" && !!top && top.score > 0 && top.score === second?.score };
 }
 
 const LEGAL_OR_FRAUD = /\b(lawyer|legal action|legal notice|sue\b|court|fraud|scam|cheat(ed|ing)|consumer forum|police)\b/;
-const NOT_RECEIVED = /(haven'?t|have not|never|not|yet to|didn'?t|did not)\s+(yet\s+)?(received|get|got|paid)|no (royalt|payment|payout)|still (waiting|pending|unpaid)|unpaid|overdue|missing (royalt|payment)/;
+const NOT_RECEIVED = /(नहीं मिल|nahi mil|nahin mil)|(haven'?t|have not|never|not|yet to|didn'?t|did not)\s+(yet\s+)?(received|get|got|paid)|no (royalt|payment|payout)|still (waiting|pending|unpaid)|unpaid|overdue|missing (royalt|payment)/;
 
 /** Priority from content signals, used as the heuristic answer and as a floor beneath model output. */
 export function policyPriority(category: TicketCategory, lowerText: string): TicketPriority {
@@ -55,7 +55,7 @@ export function policyPriority(category: TicketCategory, lowerText: string): Tic
       if (ISBN_ERROR.test(t)) priority = maxPriority(priority, "HIGH");
       break;
     case "PRINTING_QUALITY":
-      if (/misprint|binding|blurry|misaligned|defect|damaged|terrible|faded/.test(t)) priority = maxPriority(priority, "HIGH");
+      if (/misprint|binding|blurry|misaligned|defect|damaged|terrible|faded|खराब/.test(t)) priority = maxPriority(priority, "HIGH");
       break;
     case "DISTRIBUTION_AVAILABILITY":
       if (/unavailable|out of stock|not (showing|available)/.test(t)) priority = maxPriority(priority, "MEDIUM");

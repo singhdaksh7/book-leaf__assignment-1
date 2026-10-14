@@ -1,10 +1,10 @@
-import { strictIssues } from "./grounding-strict.js";
+import { findUnsafeMarkup, strictIssues } from "./grounding-strict.js";
 export interface GroundingSource { text: string; }
 
 export type GroundingIssueKind =
   | "ungrounded-number" | "ungrounded-date" | "completed-action"
   // strict (author-facing drafts) only:
-  | "payout-promise" | "unsupported-link" | "unsupported-commitment";
+  | "payout-promise" | "unsupported-link" | "unsupported-commitment" | "unsupported-timeline" | "unsupported-markup";
 
 export interface GroundingOptions {
   /** Author-facing drafts: also reject payout promises, links/contact details and refund/compensation commitments. */
@@ -26,6 +26,9 @@ const ACTION_VERBS = "issued|processed|refunded|credited|paid|transferred|dispat
 const COMPLETED_ACTION_PATTERNS: RegExp[] = [
   new RegExp(`\\b(?:i|we)(?:'ve| have)?\\s+(?:already\\s+)?(?:${ACTION_VERBS})\\b`, "i"),
   new RegExp(`\\b(?:has|have|had)\\s+(?:already\\s+|now\\s+|just\\s+)?been\\s+(?:${ACTION_VERBS})\\b`, "i"),
+  // "our team has escalated", "BookLeaf has processed"
+  new RegExp(`\\b(?:team|bookleaf|support|production|finance)\\s+(?:has|have|had)\\s+(?:already\\s+|now\\s+|just\\s+)?(?:${ACTION_VERBS})\\b`, "i"),
+  /\b(?:is|are)\s+(?:now\s+|already\s+)?(?:fixed|resolved|corrected|back (?:online|live)|live again)\b/i,
   new RegExp(`\\balready\\s+(?:${ACTION_VERBS})\\b`, "i"),
   new RegExp(`\\b(?:was|were)\\s+(?:successfully\\s+)?(?:${ACTION_VERBS})\\b`, "i")
 ];
@@ -47,7 +50,10 @@ export function datesIn(text: string): string[] {
  */
 export function findUnsupportedClaims(output: string, sources: readonly GroundingSource[], options: GroundingOptions = {}): GroundingIssue[] {
   const corpus = sources.map((s) => s.text).join("\n");
-  const allowedNumbers = numbersIn(corpus);
+  // Date components must not make loose numbers "grounded" (the 15 in 2025-12-15 does not support "15%").
+  let corpusNoDates = corpus;
+  for (const d of datesIn(corpus)) corpusNoDates = corpusNoDates.replace(d, " ");
+  const allowedNumbers = numbersIn(corpusNoDates);
   const allowedDates = new Set(datesIn(corpus).map(normDate));
   const issues: GroundingIssue[] = [];
 
@@ -65,6 +71,6 @@ export function findUnsupportedClaims(output: string, sources: readonly Groundin
     const m = re.exec(output);
     if (m) issues.push({ kind: "completed-action", detail: m[0] });
   }
-  if (options.strict) issues.push(...strictIssues(output));
+  if (options.strict) issues.push(...strictIssues(output, corpus), ...findUnsafeMarkup(output));
   return issues;
 }

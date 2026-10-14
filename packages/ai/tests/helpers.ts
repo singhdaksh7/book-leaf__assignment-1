@@ -47,3 +47,27 @@ export function okEnvelope(content: string, usage: Record<string, unknown> = { p
 export function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), { status: 200, headers: { "content-type": "application/json" }, ...init });
 }
+
+import { vi } from "vitest";
+import type { AiLogger } from "../src/usage.js";
+
+/** fetch double: consumes steps in order (the last repeats). Records every call. */
+export function mockFetch(...steps: Array<Response | Error | (() => Promise<Response>)>) {
+  const fn = vi.fn(async (_url: unknown, _init?: RequestInit) => {
+    const step = steps[Math.min(fn.mock.calls.length - 1, steps.length - 1)];
+    if (step instanceof Error) throw step;
+    return typeof step === "function" ? step() : step!.clone();
+  });
+  return fn;
+}
+export const asFetch = (f: ReturnType<typeof mockFetch>) => f as unknown as typeof fetch;
+
+/** Logger that records everything it receives, for leak assertions. */
+export function capturingLogger(): AiLogger & { events: Array<[string, unknown]> } {
+  const events: Array<[string, unknown]> = [];
+  return { events, warn: (event, meta) => { events.push([event, meta]); } };
+}
+
+export const classifyContent = (o: Record<string, unknown> = {}) => JSON.stringify(modelAnswer({ category: "ROYALTY_PAYMENTS", priority: "HIGH", citations: ["kb.royalty-policy"], ...o }));
+export const draftContent = (body: string, citations: string[] = ["kb.royalty-policy"]) =>
+  JSON.stringify({ draft: `Dear {{authorFirstName}},\n\n${body}\n\nWarm regards,\nBookLeaf Author Support`, citations });

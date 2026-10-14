@@ -101,11 +101,12 @@ describe("OpenRouterProvider", () => {
     expect(res.usage).toMatchObject({ model: "meta/fallback", fallbackUsed: true, attempts: 2 });
   });
 
-  it("does not retry or fall back on non-retryable 4xx", async () => {
-    const f = mockFetch(new Response("", { status: 401 }));
-    await expect(provider(f as unknown as typeof fetch, { OPENROUTER_FALLBACK_MODEL: "meta/fallback" }).complete(request)).rejects.toMatchObject({ code: "AI_PROVIDER_ERROR" });
-    expect(f).toHaveBeenCalledTimes(1);
-  });
+  it.each([[400, "AI_PROVIDER_ERROR"], [402, "AI_PROVIDER_ERROR"], [401, "AI_NOT_CONFIGURED"], [403, "AI_NOT_CONFIGURED"]])(
+    "does not retry or fall back on non-retryable %i (%s)", async (status, code) => {
+      const f = mockFetch(new Response("", { status }));
+      await expect(provider(f as unknown as typeof fetch, { OPENROUTER_FALLBACK_MODEL: "meta/fallback" }).complete(request)).rejects.toMatchObject({ code });
+      expect(f).toHaveBeenCalledTimes(1);
+    });
 
   it("times out a hung request, retries, and reports AI_TIMEOUT", async () => {
     const hang = (_url: unknown, init?: RequestInit) => new Promise<Response>((_, reject) => {

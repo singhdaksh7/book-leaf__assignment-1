@@ -11,7 +11,7 @@ export { KB_CHUNKS, KB_VERSION, type KbChunk, type ChunkKind } from "./knowledge
 export { KeywordKnowledgeRetriever, createKnowledgeRetriever, type KnowledgeRetriever, type RetrievalQuery, type RetrievedChunk } from "./knowledge/retriever.js";
 
 export { findUnsupportedClaims, type GroundingIssue, type GroundingSource } from "./grounding.js";
-export { detectInjection, sanitizeUntrusted } from "./safety.js";
+export { detectInjection, sanitizeUntrusted, redactPii } from "./safety.js";
 
 export { createTicketClassifier, type TicketClassifier, type TicketClassifierOptions, type TicketClassification, type ClassifyTicketInput } from "./classifier/classifier.js";
 export { modelClassificationSchema, parseModelClassification, type ModelClassification } from "./classifier/schema.js";
@@ -26,4 +26,4 @@ export {
   PROMPT_VERSION, pendingRow, decideAttempt, failedRow, serializeAttempt, retryAdviceFor,
   type AiAnalysisRowData, type AiAnalysisRowLike, type AttemptDecision, type AttemptStatus, type DecisionOptions, type ResultQuality, type RetryAdvice
 } from "./persistence.js";
-export { analyzeForPersistence, inputFingerprint, worstCaseAnalysisMs, type AttemptResult, type DetailedAnalyzer } from "./attempt.js";
+export { analyzeForPersistence, inputFingerprint, worstCaseAnalysisMs, isPendingAttemptAbandoned, abandonedRow, ABANDONED_MARGIN_MS, type AttemptResult, type DetailedAnalyzer } from "./attempt.js";
