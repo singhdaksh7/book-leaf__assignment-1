@@ -1,0 +1,54 @@
+# Dependencies and generated output
+node_modules/
+dist/
+build/
+.vite/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+
+# Guard against accidental tsc emission beside these TypeScript-only sources.
+# Keep legitimate JavaScript sources/configuration elsewhere eligible for tracking.
+/packages/contracts/src/**/*.js
+/packages/contracts/src/**/*.js.map
+/packages/contracts/src/**/*.d.ts
+/packages/contracts/src/**/*.d.ts.map
+/packages/db/src/**/*.js
+/packages/db/src/**/*.js.map
+/packages/db/src/**/*.d.ts
+/packages/db/src/**/*.d.ts.map
+/packages/ai/src/**/*.js
+/packages/ai/src/**/*.js.map
+/packages/ai/src/**/*.d.ts
+/packages/ai/src/**/*.d.ts.map
+/apps/api/src/**/*.js
+/apps/api/src/**/*.js.map
+/apps/api/src/**/*.d.ts
+/apps/api/src/**/*.d.ts.map
+/apps/web/src/**/*.js
+/apps/web/src/**/*.js.map
+/apps/web/src/**/*.jsx
+/apps/web/src/**/*.jsx.map
+# Only the known emitted entry declarations; preserve handwritten browser types.
+/apps/web/src/main.d.ts
+/apps/web/src/main.d.ts.map
+
+# Local configuration and secrets (safe templates remain tracked)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Confidential assignment source material and local tooling
+reference/
+/data/bookleaf_sample_data.json
+.code-review-graph/
+
+# Logs and operating-system files
+*.log
+.DS_Store
+Thumbs.db

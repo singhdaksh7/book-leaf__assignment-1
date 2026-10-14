@@ -1,0 +1,25 @@
+{
+  "name": "bookleaf-author-support-portal",
+  "private": true,
+  "version": "0.1.0",
+  "description": "BookLeaf Author Support & Communication Portal",
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @bookleaf/contracts && npm run build --workspace @bookleaf/db && npm run build --workspace @bookleaf/ai && npm run build --workspace @bookleaf/api && npm run build --workspace @bookleaf/web",
+    "dev": "npm run dev --workspace @bookleaf/api",
+    "dev:web": "npm run dev --workspace @bookleaf/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run build --workspace @bookleaf/contracts && npm run build --workspace @bookleaf/db && npm run typecheck --workspace @bookleaf/db && npm run typecheck --workspace @bookleaf/ai && npm run typecheck --workspace @bookleaf/api && npm run typecheck --workspace @bookleaf/web",
+    "test:scaffold": "node --test tests/scaffold.test.mjs",
+    "test": "npm run test --workspaces --if-present",
+    "test:api": "npm run test --workspace @bookleaf/api",
+    "test:e2e": "npm run test:e2e --workspace @bookleaf/web"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3"
+  }
+}

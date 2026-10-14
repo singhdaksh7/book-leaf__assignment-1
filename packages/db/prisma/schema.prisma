@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  AUTHOR
+  ADMIN
+}
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+enum TicketCategory {
+  ROYALTY_PAYMENTS
+  ISBN_METADATA
+  PRINTING_QUALITY
+  DISTRIBUTION_AVAILABILITY
+  BOOK_STATUS_PRODUCTION
+  GENERAL_INQUIRY
+}
+enum TicketPriority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+enum MessageVisibility {
+  AUTHOR
+  ADMIN
+}
+enum AiAnalysisStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  passwordHash String
+  role UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  authorProfile AuthorProfile?
+  sessions Session[]
+  assignedTickets Ticket[] @relation("TicketAssignee")
+  messages TicketMessage[] @relation("MessageAuthor")
+  notes InternalNote[] @relation("NoteAuthor")
+  auditLogs AuditLog[] @relation("AuditActor")
+  assignmentsMade TicketAssignment[] @relation("AssignmentActor")
+  assignmentsReceived TicketAssignment[] @relation("AssignmentAssignee")
+}
+
+model AuthorProfile {
+  id String @id @default(cuid())
+  userId String @unique
+  externalAuthorId String @unique
+  name String
+  phone String
+  city String
+  joinedDate DateTime @db.Date
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  books Book[]
+  tickets Ticket[]
+}
+
+model Book {
+  id String @id @default(cuid())
+  externalBookId String @unique
+  authorId String
+  title String
+  isbn String
+  genre String
+  publicationDate DateTime? @db.Date
+  status String
+  mrp Int?
+  authorRoyaltyPerCopy Int?
+  totalCopiesSold Int
+  totalRoyaltyEarned Int
+  royaltyPaid Int
+  royaltyPending Int
+  lastRoyaltyPayoutDate DateTime? @db.Date
+  printPartner String?
+  availableOn String[]
+  author AuthorProfile @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  tickets Ticket[]
+}
+
+model Session {
+  id String @id @default(cuid())
+  tokenHash String @unique
+  userId String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Ticket {
+  id String @id @default(cuid())
+  authorId String
+  bookId String?
+  subject String
+  description String
+  status TicketStatus @default(OPEN)
+  category TicketCategory?
+  priority TicketPriority?
+  assigneeId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  author AuthorProfile @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  book Book? @relation(fields: [bookId], references: [id], onDelete: SetNull)
+  assignee User? @relation("TicketAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  messages TicketMessage[]
+  internalNotes InternalNote[]
+  assignments TicketAssignment[]
+  aiAnalyses AiAnalysis[]
+}
+
+model TicketMessage {
+  id String @id @default(cuid())
+  ticketId String
+  authorId String
+  body String
+  visibility MessageVisibility @default(AUTHOR)
+  createdAt DateTime @default(now())
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+}
+
+model InternalNote {
+  id String @id @default(cuid())
+  ticketId String
+  authorId String
+  body String
+  createdAt DateTime @default(now())
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+}
+
+model TicketAssignment {
+  id String @id @default(cuid())
+  ticketId String
+  assigneeId String?
+  assignedById String
+  createdAt DateTime @default(now())
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  assignee User? @relation("AssignmentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  assignedBy User @relation("AssignmentActor", fields: [assignedById], references: [id], onDelete: Restrict)
+}
+
+model AiAnalysis {
+  // See docs/DATABASE_SCHEMA.md for state invariants and API mapping.
+  // requiresHumanReview is a fixed true API policy, not a stored field.
+  id String @id @default(cuid())
+  ticketId String
+  status AiAnalysisStatus @default(PENDING)
+  model String?
+  promptVersion String
+  category TicketCategory?
+  priority TicketPriority?
+  confidence Float?
+  rationale String?
+  draftResponse String?
+  // COMPLETED: JSON string[] of KB chunk IDs -> API knowledgeBaseCitations.
+  // PENDING/FAILED: database NULL; never store prompts or source records here.
+  citations Json?
+  inputTokens Int?
+  outputTokens Int?
+  costMicrounits Int?
+  errorCode String?
+  createdAt DateTime @default(now())
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  actorId String?
+  action String
+  entityType String
+  entityId String
+  before Json?
+  after Json?
+  requestId String?
+  createdAt DateTime @default(now())
+  actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+}
