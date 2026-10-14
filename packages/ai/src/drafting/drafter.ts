@@ -38,6 +38,8 @@ export interface ResponseDrafterOptions {
   logger?: AiLogger;
 }
 
+/** Source: assignment sample for ISBN errors ("Provide a 48-hour resolution timeline"); also in docs/AI_DESIGN.md. */
+const ISBN_ESCALATION_TIMELINE = "48 hours";
 const TONE = KB_CHUNKS.find((c) => c.kind === "tone")!;
 
 /**
@@ -58,12 +60,12 @@ export function createResponseDrafter(options: ResponseDrafterOptions): Response
       const policy = selectPolicy(input, category, ticketText, retriever, limits);
       const policyIds = policy.map((c) => c.id);
 
-      const fallback = (reason: AiErrorCode, groundingIssues: GroundingIssue[] = []): ResponseDraft => {
+      const fallback = (reason: AiErrorCode, groundingIssues: GroundingIssue[] = [], spent: UsageRecord | null = null): ResponseDraft => {
         options.logger?.warn("ai.drafter.fallback", { reason });
         const f = fallbackDraft(category, firstName);
         return {
           draft: f.draft, citations: f.citations, retrievedChunkIds: policyIds.length > 0 ? policyIds : f.citations,
-          source: "fallback", fallbackReason: reason, groundingIssues, securityFlags, usage: null
+          source: "fallback", fallbackReason: reason, groundingIssues, securityFlags, usage: spent
         };
       };
 
@@ -84,17 +86,19 @@ export function createResponseDrafter(options: ResponseDrafterOptions): Response
       }
 
       let parsed;
-      try { parsed = parseModelDraft(completion.content); } catch { return fallback("AI_INVALID_OUTPUT"); }
-      if (parsed.citations.some((id) => !policyIds.includes(id))) return fallback("AI_UNGROUNDED_OUTPUT");
+      try { parsed = parseModelDraft(completion.content); } catch { return fallback("AI_INVALID_OUTPUT", [], completion.usage); }
+      if (parsed.citations.some((id) => !policyIds.includes(id))) return fallback("AI_UNGROUNDED_OUTPUT", [], completion.usage);
 
       const text = parsed.draft.replace(GREETING_PLACEHOLDER, firstName);
       // The greeting name is author data we supplied, so it must not trip the checks; everything else must be grounded.
       const sources = [
         { text: ticketText }, ...history.map((h) => ({ text: h.body })), { text: JSON.stringify(bookFacts) },
-        ...policy.map((c) => ({ text: c.content })), { text: TONE.content }
+        ...policy.map((c) => ({ text: c.content })),
+        // The only response timeline the source documents give for a reported issue: ISBN errors get a 48-hour timeline.
+        ...(category === "ISBN_METADATA" ? [{ text: ISBN_ESCALATION_TIMELINE }] : [])
       ];
       const issues = findUnsupportedClaims(parsed.draft.replace(GREETING_PLACEHOLDER, ""), sources, { strict: true });
-      if (issues.length > 0) return fallback("AI_UNGROUNDED_OUTPUT", issues);
+      if (issues.length > 0) return fallback("AI_UNGROUNDED_OUTPUT", issues, completion.usage);
 
       // Every draft carries at least one citation: the model's, else the category's own policy chunk (the top-ranked one).
       const primary = policy.find((c) => c.categories.includes(category))?.id ?? policyIds[0];

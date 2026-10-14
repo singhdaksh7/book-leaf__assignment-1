@@ -21,3 +21,9 @@ export { createResponseDrafter, type ResponseDrafter, type ResponseDrafterOption
 export { fallbackDraft, greetingName } from "./drafting/fallback.js";
 export { DEFAULT_DRAFTER_LIMITS, type DrafterLimits } from "./drafting/prompt.js";
 export { BookLeafAiService, createAiService, createAiServiceFromEnv, type AnalysisOutcome, type AnalysisMeta, type CreateAiServiceOptions } from "./service.js";
+
+export {
+  PROMPT_VERSION, pendingRow, decideAttempt, failedRow, serializeAttempt, retryAdviceFor,
+  type AiAnalysisRowData, type AiAnalysisRowLike, type AttemptDecision, type AttemptStatus, type DecisionOptions, type ResultQuality, type RetryAdvice
+} from "./persistence.js";
+export { analyzeForPersistence, inputFingerprint, worstCaseAnalysisMs, type AttemptResult, type DetailedAnalyzer } from "./attempt.js";

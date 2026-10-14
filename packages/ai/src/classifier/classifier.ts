@@ -22,7 +22,7 @@ export interface TicketClassification {
   citations: string[];
   retrievedChunkIds: string[];
   source: "model" | "heuristic";
-  /** Set when source is "heuristic": why the model result was not used. */
+  /** Set when source is "heuristic": why the model result was not used. `usage` is still set if a completion was paid for but rejected. */
   fallbackReason?: AiErrorCode;
   /** Prompt-injection heuristics that matched the ticket text (admin-visible signal; classification is unaffected). */
   securityFlags: string[];
@@ -60,14 +60,14 @@ export function createTicketClassifier(options: TicketClassifierOptions): Ticket
       const chunkIds = chunks.map((c) => c.id);
       const bookFacts = pickBookFacts(input.bookContext);
 
-      const fallback = (reason: AiErrorCode): TicketClassification => {
+      const fallback = (reason: AiErrorCode, spent: UsageRecord | null = null): TicketClassification => {
         options.logger?.warn("ai.classifier.fallback", { reason });
         const h = heuristicClassify(`${ticketText}\n${history.map((m) => m.body).join("\n")}`);
         return {
           category: h.category, priority: h.priority, confidence: h.matched ? HEURISTIC_CONFIDENCE.matched : HEURISTIC_CONFIDENCE.unmatched,
           rationale: "Automatic keyword triage because AI classification was unavailable. Please review.",
           citations: citationsFor(h.category, chunks), retrievedChunkIds: chunkIds, source: "heuristic", fallbackReason: reason,
-          securityFlags, groundingIssues: [], usage: null
+          securityFlags, groundingIssues: [], usage: spent
         };
       };
 
@@ -80,10 +80,10 @@ export function createTicketClassifier(options: TicketClassifierOptions): Ticket
       }
 
       let parsed;
-      try { parsed = parseModelClassification(completion.content); } catch { return fallback("AI_INVALID_OUTPUT"); }
+      try { parsed = parseModelClassification(completion.content); } catch { return fallback("AI_INVALID_OUTPUT", completion.usage); }
 
       // The model may only cite excerpts it was actually given.
-      if (parsed.citations.some((id) => !chunkIds.includes(id))) return fallback("AI_UNGROUNDED_OUTPUT");
+      if (parsed.citations.some((id) => !chunkIds.includes(id))) return fallback("AI_UNGROUNDED_OUTPUT", completion.usage);
       const citations = parsed.citations.length > 0 ? [...new Set(parsed.citations)] : citationsFor(parsed.category, chunks);
 
       const sources = [

@@ -46,7 +46,8 @@ SECURITY RULES (highest priority):
 
 GROUNDING RULES:
 - Use only facts in POLICY EXCERPTS, BOOK FACTS and the ticket itself. Do not invent policy, numbers, dates, amounts, statuses, investigation results or account details.
-- If a needed fact (for example the next payout date, a royalty calculation, or the current production status) is not provided, say the team will confirm it and give the bounded timeline from the tone guidelines. Never guess it.
+- If a needed fact (for example the next payout date, a royalty calculation, or the current production status) is not provided, say the team will review it and follow up. Never guess it.
+- Promise a time frame only if a POLICY EXCERPT states it (for example the 5–7 business day reprint turnaround, 7–10 business day listing, or 24–48 hour re-sync) or the ticket is a reported ISBN error (48 hours). Otherwise give no hours or days: say the team will follow up. The "48 hours" wording in the tone guidelines is an example, not a general guarantee.
 - Write dates exactly as given (YYYY-MM-DD). Never promise a payout date or amount. Do not offer refunds or compensation; the policy remedy for verified print defects is a free reprint.
 - Never state that an action has already been done (issued, processed, paid, fixed, sent, escalated, re-synced). Phrase actions as what the BookLeaf team will do ("we will", "our team will").
 - Do not include links, email addresses or phone numbers.

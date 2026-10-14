@@ -19,7 +19,7 @@ const SCENARIOS: Scenario[] = [
     name: "royalty inquiry", subject: "No royalty yet", description: "I published my book 4 months ago and still haven't received any royalty. What's going on?",
     book: { title: "Sample Book", status: "Published", royaltyPending: 2500, lastRoyaltyPayoutDate: null },
     category: "ROYALTY_PAYMENTS", priority: "HIGH", chunk: "kb.royalty-policy",
-    body: "I'm sorry you have waited 4 months without a clear answer, and I understand the frustration. Royalties are calculated quarterly and paid within 45 days of the quarter ending, by bank transfer to the account linked in your dashboard. Our records show ₹2,500 pending for this book. Our team will confirm your next payout date and get back to you within 48 hours. Please check that your bank details are linked in your dashboard."
+    body: "I'm sorry you have waited 4 months without a clear answer, and I understand the frustration. Royalties are calculated quarterly and paid within 45 days of the quarter ending, by bank transfer to the account linked in your dashboard. Our records show ₹2,500 pending for this book. Our team will confirm your next payout date and follow up with you. Please check that your bank details are linked in your dashboard."
   },
   {
     name: "ISBN escalation", subject: "Different ISBN on Amazon", description: "My book is showing a different ISBN on Amazon than what's on the physical copy.",
@@ -41,7 +41,7 @@ const SCENARIOS: Scenario[] = [
     name: "production update", subject: "Still in typesetting", description: "It's been 3 weeks and my book is still in typesetting. When will it be done?",
     book: { title: "Sample Book", status: "Typesetting", publicationDate: null },
     category: "BOOK_STATUS_PRODUCTION", priority: "MEDIUM", chunk: "kb.production-stages",
-    body: "Thank you for your patience, and I understand you want a clear answer after 3 weeks. Your book is currently at Typesetting. Delays typically happen at Cover Design and Proofreading, and we will work through the next steps with you. Our team will check the details and get back to you within 48 hours with an updated timeline."
+    body: "Thank you for your patience, and I understand you want a clear answer after 3 weeks. Your book is currently at Typesetting. Delays typically happen at Cover Design and Proofreading, and we will work through the next steps with you. Our team will check the details and follow up with you with an updated timeline."
   }
 ];
 
@@ -93,7 +93,7 @@ describe("provider failure", () => {
     expect(a).toMatchObject({ category: "ROYALTY_PAYMENTS", priority: "CRITICAL", requiresHumanReview: true });
     expect(a.confidence).toBeLessThanOrEqual(0.3);
     expect(a.draftResponse).toContain("Dear Jane,");
-    expect(a.draftResponse).toContain("within 48 hours");
+    expect(a.draftResponse).not.toMatch(/48|hours/); // the sources give no general response-time guarantee
     expect(a.knowledgeBaseCitations).toEqual(["kb.royalty-policy"]);
   });
 
@@ -191,7 +191,7 @@ describe("unsupported claims are rejected", () => {
     expect(outcome.analysis.knowledgeBaseCitations).not.toContain("kb.isbn-policy");
   });
   it("allows a grounded draft to state the book's real figures and future commitments", async () => {
-    const body = "Our records show ₹2,500 pending. Our team will review this and get back to you within 48 hours.";
+    const body = "Our records show ₹2,500 pending. Our team will review this and follow up with you.";
     const provider = scriptedProvider(modelAnswer({ category: "ROYALTY_PAYMENTS", citations: [] }), draftAnswer(body, []));
     const outcome = await createAiService({ provider }).analyzeTicketDetailed(input(royalty.subject, royalty.description, { bookContext: royalty.book }));
     expect(outcome.meta.draftSource).toBe("model");
@@ -226,7 +226,8 @@ describe("deterministic fallback drafts", () => {
     const f = fallbackDraft(category, "Jane");
     expect(findUnsupportedClaims(f.draft, sources, { strict: true })).toEqual([]);
     expect(f.draft.startsWith("Dear Jane,")).toBe(true);
-    expect(f.draft).toMatch(/within 48 hours/);
+    expect(f.draft).not.toMatch(/within 48 hours|get back to you/); // no invented response-time promise
+    expect(f.draft).toMatch(/follow up/);
     expect(f.citations.length).toBeGreaterThan(0);
     expect(f.citations.every((id) => KB_CHUNKS.some((c) => c.id === id))).toBe(true);
   });
@@ -250,5 +251,19 @@ describe("cost controls for drafting", () => {
     expect((call.user.match(/^\[kb\./gm) ?? []).length).toBeLessThanOrEqual(2);
     expect(call.user).not.toContain("msg5 ");
     expect(call.user.length).toBeLessThan(7000);
+  });
+});
+
+describe("response time promises", () => {
+  it("rejects a 48-hour promise outside reported ISBN errors (sources give no general guarantee)", async () => {
+    const r = SCENARIOS[0]!;
+    const provider = scriptedProvider(modelAnswer({ category: r.category, priority: r.priority, citations: [r.chunk] }),
+      draftAnswer(`${r.body} Our team will get back to you within 48 hours.`, [r.chunk]));
+    const outcome = await createAiService({ provider }).analyzeTicketDetailed(input(r.subject, r.description, { bookContext: r.book }));
+    expect(outcome.meta).toMatchObject({ draftSource: "fallback", fallbackReasons: ["AI_UNGROUNDED_OUTPUT"] });
+    expect(outcome.analysis.draftResponse).not.toMatch(/48/);
+  });
+  it("keeps the 48-hour timeline available for ISBN errors, as the source examples specify", () => {
+    expect(SCENARIOS[1]!.body).toContain("within 48 hours");
   });
 });
