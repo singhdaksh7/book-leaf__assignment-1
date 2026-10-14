@@ -35,6 +35,7 @@ export const TicketDetailPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
+  const [replyError, setReplyError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -42,6 +43,7 @@ export const TicketDetailPage: React.FC = () => {
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastSnapshotRef = useRef<string | null>(null);
 
   const loadTicket = useCallback(
     async (showRefreshIndicator = false) => {
@@ -56,10 +58,19 @@ export const TicketDetailPage: React.FC = () => {
             return { items: [] };
           }),
         ]);
+
+        // Avoid duplicate UI updates when polling and SSE overlap
+        const snapshot = `${ticketRes.ticket.updatedAt}_${ticketRes.ticket.status}_${ticketRes.messages.length}_${attachmentsRes.items.length}`;
+        if (!showRefreshIndicator && lastSnapshotRef.current === snapshot) {
+          return;
+        }
+        lastSnapshotRef.current = snapshot;
+
         setTicket(ticketRes.ticket);
         // Guarantee only author-visible messages are rendered
         setMessages(ticketRes.messages.filter((m) => m.visibility === "AUTHOR"));
         setAttachments(attachmentsRes.items);
+        ticketEventManager.recordTicketVersion(ticketRes.ticket.id, ticketRes.ticket.updatedAt);
       } catch (err: any) {
         setError(err.message || "Failed to load ticket conversation.");
       } finally {
@@ -104,24 +115,42 @@ export const TicketDetailPage: React.FC = () => {
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!replyText.trim() || !ticketId || isSending) return;
+    const trimmed = replyText.trim();
+    if (!trimmed || !ticketId || isSending) return;
 
     try {
       setIsSending(true);
-      // Create author message
-      const newMsg: AuthorTicketMessage = {
-        id: `msg_${Date.now()}`,
-        ticketId,
-        authorId: user?.id || "usr_auth_01",
-        body: replyText.trim(),
-        visibility: "AUTHOR",
-        createdAt: new Date().toISOString(),
-      };
+      setReplyError(null);
 
-      setMessages((prev) => [...prev, newMsg]);
+      const res = await (client.replyToAuthorTicket
+        ? client.replyToAuthorTicket(ticketId, { body: trimmed })
+        : client.addAuthorReply(ticketId, { body: trimmed }));
+
+      // Display the persisted reply in the conversation (avoid duplicates)
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === res.message.id)) {
+          return prev;
+        }
+        return [...prev, res.message];
+      });
+
+      // Clear the reply input only after successfully saving
       setReplyText("");
     } catch (err: any) {
       console.error("Failed to send reply:", err);
+      if (err?.status === 409 || err?.code === "CONFLICT") {
+        setReplyError("This ticket is closed. Further replies are not permitted.");
+        // Update ticket status to CLOSED immediately
+        setTicket((prev) => (prev ? { ...prev, status: "CLOSED" } : prev));
+      } else if (err?.status === 403 || err?.code === "FORBIDDEN") {
+        setReplyError(err.message || "You are not authorized to reply to this ticket.");
+      } else if (err?.status === 401 || err?.code === "UNAUTHENTICATED") {
+        setReplyError("Your session has expired. Please log in again.");
+      } else if (err?.status === 400 || err?.code === "VALIDATION_ERROR") {
+        setReplyError(err.message || "Message validation failed. Please check your reply.");
+      } else {
+        setReplyError(err.message || "Failed to send reply. Please try again.");
+      }
     } finally {
       setIsSending(false);
     }
@@ -391,12 +420,32 @@ export const TicketDetailPage: React.FC = () => {
           <form onSubmit={handleSendReply} className="mt-6">
             <Card className="shadow-card">
               <CardContent className="p-4 space-y-3">
+                {replyError && (
+                  <div
+                    role="alert"
+                    className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg flex items-center justify-between"
+                  >
+                    <span>{replyError}</span>
+                    <button
+                      type="button"
+                      onClick={() => setReplyError(null)}
+                      className="text-red-500 hover:text-red-700 font-bold ml-2 text-sm"
+                      aria-label="Dismiss error"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
                 <textarea
                   rows={3}
                   value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
+                  onChange={(e) => {
+                    setReplyText(e.target.value);
+                    if (replyError) setReplyError(null);
+                  }}
+                  disabled={isSending}
                   placeholder="Type your reply to BookLeaf support..."
-                  className="w-full rounded-lg border border-stone-200 p-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500"
+                  className="w-full rounded-lg border border-stone-200 p-3 text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 disabled:opacity-60"
                 />
                 <div className="flex items-center justify-between pt-1">
                   <span className="text-[11px] text-stone-400">

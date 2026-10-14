@@ -73,6 +73,8 @@ export interface ApiClient {
   getTickets(filters?: TicketFilter): Promise<TicketListResponse>;
   getTicketById(ticketId: string): Promise<TicketDetailResponse>;
   createTicket(request: CreateTicketRequest): Promise<TicketResponse>;
+  replyToAuthorTicket(ticketId: string, request: TicketReplyRequest): Promise<TicketMessageResponse>;
+  addAuthorReply(ticketId: string, request: TicketReplyRequest): Promise<TicketMessageResponse>;
 
   // Author - Attachments
   uploadAttachment(ticketId: string, file: File): Promise<AttachmentResponse>;

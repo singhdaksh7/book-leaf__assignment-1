@@ -415,6 +415,43 @@ export class MockApiClient implements ApiClient {
     return { ticket: newTicket };
   }
 
+  async replyToAuthorTicket(ticketId: string, request: TicketReplyRequest): Promise<TicketMessageResponse> {
+    await delay(200);
+    const ticket = this.tickets.find((t) => t.id === ticketId);
+    if (!ticket) {
+      throw new ApiClientError("NOT_FOUND", `Ticket with ID "${ticketId}" was not found`, 404);
+    }
+    if (ticket.status === "CLOSED") {
+      throw new ApiClientError("CONFLICT", "Cannot reply to a closed ticket", 409);
+    }
+    const trimmed = (request.body || "").trim();
+    if (!trimmed) {
+      throw new ApiClientError("VALIDATION_ERROR", "Message body cannot be empty", 400);
+    }
+
+    const now = new Date().toISOString();
+    const msg: AuthorTicketMessage = {
+      id: `msg_${Date.now()}`,
+      ticketId,
+      authorId: this.currentUser?.id || "usr_auth_01",
+      body: trimmed,
+      visibility: "AUTHOR",
+      createdAt: now,
+    };
+
+    if (!this.messages[ticketId]) {
+      this.messages[ticketId] = [];
+    }
+    this.messages[ticketId].push(msg);
+    ticket.updatedAt = now;
+
+    return { message: msg };
+  }
+
+  async addAuthorReply(ticketId: string, request: TicketReplyRequest): Promise<TicketMessageResponse> {
+    return this.replyToAuthorTicket(ticketId, request);
+  }
+
   // Admin
   async getAdminTickets(filters?: TicketFilter): Promise<AdminQueueResponse> {
     return this.getTickets(filters);

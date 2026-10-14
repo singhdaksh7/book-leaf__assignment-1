@@ -1,4 +1,5 @@
 import { getApiClient } from "./index";
+import { onSessionExpired } from "./http";
 
 export type TicketEventType =
   | "ticket.created"
@@ -9,7 +10,7 @@ export type TicketEventType =
 export interface TicketEventPayload {
   ticketId: string;
   occurredAt: string;
-  version?: number;
+  version?: string; // ISO timestamp string per API contract
   [key: string]: unknown;
 }
 
@@ -21,25 +22,58 @@ export type TicketEventListener = (event: {
 export class TicketEventManager {
   private eventSource: EventSource | null = null;
   private listeners: Set<TicketEventListener> = new Set();
-  private pollingIntervalId: any = null;
+  private pollingIntervalId: ReturnType<typeof setInterval> | null = null;
   private isUsingPolling = false;
+  private lastSeenVersions: Map<string, string> = new Map();
+  private isClosedExplicitly = false;
+  private unregisterSessionExpired: (() => void) | null = null;
 
   constructor() {
+    this.unregisterSessionExpired = onSessionExpired(() => {
+      this.handleSessionExpired();
+    });
     this.init();
   }
 
-  private init() {
+  public init() {
+    this.isClosedExplicitly = false;
+
+    // Check if EventSource is supported in browser runtime
+    if (typeof window === "undefined" || typeof EventSource === "undefined") {
+      this.startPollingFallback();
+      return;
+    }
+
     const client = getApiClient();
     if (client.isMock) {
       this.startPollingFallback();
       return;
     }
 
+    // If an EventSource already exists and is active, do not recreate
+    if (
+      this.eventSource &&
+      (this.eventSource.readyState === EventSource.OPEN ||
+        this.eventSource.readyState === EventSource.CONNECTING)
+    ) {
+      return;
+    }
+
     try {
+      if (this.eventSource) {
+        this.eventSource.close();
+        this.eventSource = null;
+      }
+
       const baseUrl = (import.meta.env.VITE_API_BASE_URL || "/api/v1").replace(/\/+$/, "");
       this.eventSource = new EventSource(`${baseUrl}/events/tickets`, {
         withCredentials: true,
       });
+
+      this.eventSource.onopen = () => {
+        // SSE is active; stop polling fallback to prevent redundant network requests
+        this.stopPollingFallback();
+      };
 
       const eventTypes: TicketEventType[] = [
         "ticket.created",
@@ -60,23 +94,37 @@ export class TicketEventManager {
       });
 
       this.eventSource.onerror = () => {
-        console.warn("SSE connection interrupted. Enabling polling fallback.");
-        this.eventSource?.close();
-        this.eventSource = null;
-        this.startPollingFallback();
+        if (this.isClosedExplicitly) {
+          return;
+        }
+
+        // Allow native EventSource reconnection for transient errors.
+        // In native EventSource, transient connection drops put readyState into CONNECTING (0).
+        if (this.eventSource && this.eventSource.readyState === EventSource.CONNECTING) {
+          // Native reconnect in progress; keep polling as temporary fallback if needed
+          this.startPollingFallback();
+          return;
+        }
+
+        // If readyState is CLOSED (2), native reconnection has halted (e.g. fatal or 401/403)
+        if (this.eventSource && this.eventSource.readyState === EventSource.CLOSED) {
+          console.warn("SSE connection closed. Enabling polling fallback.");
+          this.eventSource.close();
+          this.eventSource = null;
+          this.startPollingFallback();
+        }
       };
     } catch {
       this.startPollingFallback();
     }
   }
 
-  private startPollingFallback() {
-    if (this.isUsingPolling) return;
+  public startPollingFallback() {
+    if (this.pollingIntervalId || this.isClosedExplicitly) return;
     this.isUsingPolling = true;
 
-    // Polling heartbeat every 25 seconds
+    // Polling heartbeat every 25 seconds per API contract
     this.pollingIntervalId = setInterval(() => {
-      // Trigger update tick
       this.notify({
         type: "ticket.updated",
         payload: {
@@ -87,6 +135,41 @@ export class TicketEventManager {
     }, 25000);
   }
 
+  public stopPollingFallback() {
+    if (this.pollingIntervalId) {
+      clearInterval(this.pollingIntervalId);
+      this.pollingIntervalId = null;
+    }
+    this.isUsingPolling = false;
+  }
+
+  public isPollingActive(): boolean {
+    return this.isUsingPolling;
+  }
+
+  public getEventSource(): EventSource | null {
+    return this.eventSource;
+  }
+
+  public recordTicketVersion(ticketId: string, version: string): void {
+    if (!ticketId || !version) return;
+    const existing = this.lastSeenVersions.get(ticketId);
+    if (!existing || version > existing) {
+      this.lastSeenVersions.set(ticketId, version);
+    }
+  }
+
+  public isDuplicateEvent(ticketId: string, version?: string): boolean {
+    if (!ticketId || !version) return false;
+    const lastVersion = this.lastSeenVersions.get(ticketId);
+    if (!lastVersion) return false;
+    return version <= lastVersion;
+  }
+
+  public clearVersionCache(): void {
+    this.lastSeenVersions.clear();
+  }
+
   public subscribe(listener: TicketEventListener): () => void {
     this.listeners.add(listener);
     return () => {
@@ -95,6 +178,16 @@ export class TicketEventManager {
   }
 
   public notify(event: { type: TicketEventType; payload: TicketEventPayload }) {
+    const { ticketId, version } = event.payload;
+
+    // Event deduplication using ticket ID and ISO timestamp version
+    if (ticketId && version) {
+      if (this.isDuplicateEvent(ticketId, version)) {
+        return; // Drop duplicate event
+      }
+      this.recordTicketVersion(ticketId, version);
+    }
+
     this.listeners.forEach((listener) => {
       try {
         listener(event);
@@ -104,16 +197,28 @@ export class TicketEventManager {
     });
   }
 
-  public destroy() {
+  public close() {
+    this.isClosedExplicitly = true;
     if (this.eventSource) {
       this.eventSource.close();
       this.eventSource = null;
     }
-    if (this.pollingIntervalId) {
-      clearInterval(this.pollingIntervalId);
-      this.pollingIntervalId = null;
+    this.stopPollingFallback();
+  }
+
+  public handleSessionExpired() {
+    this.close();
+    this.lastSeenVersions.clear();
+  }
+
+  public destroy() {
+    this.close();
+    if (this.unregisterSessionExpired) {
+      this.unregisterSessionExpired();
+      this.unregisterSessionExpired = null;
     }
     this.listeners.clear();
+    this.lastSeenVersions.clear();
   }
 }
 

@@ -64,6 +64,26 @@ export const attachmentListResponseSchema = z.object({
 });
 
 
+type SessionExpiredHandler = () => void;
+const sessionExpiredHandlers = new Set<SessionExpiredHandler>();
+
+export function onSessionExpired(handler: SessionExpiredHandler): () => void {
+  sessionExpiredHandlers.add(handler);
+  return () => {
+    sessionExpiredHandlers.delete(handler);
+  };
+}
+
+export function notifySessionExpired(): void {
+  sessionExpiredHandlers.forEach((handler) => {
+    try {
+      handler();
+    } catch (err) {
+      console.warn("Error in session expired handler:", err);
+    }
+  });
+}
+
 function getCsrfToken(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|;\s*)(?:XSRF-TOKEN|csrfToken|_csrf)=([^;]+)/);
@@ -148,6 +168,9 @@ export class HttpApiClient implements ApiClient {
     }
 
     if (!response.ok) {
+      if (response.status === 401) {
+        notifySessionExpired();
+      }
       const parsedError = apiErrorSchema.safeParse(data);
       if (parsedError.success) {
         const { code, message, details, requestId } = parsedError.data.error;
@@ -230,6 +253,21 @@ export class HttpApiClient implements ApiClient {
       method: "POST",
       body: JSON.stringify(request),
     }, ticketResponseSchema);
+  }
+
+  async replyToAuthorTicket(ticketId: string, request: TicketReplyRequest): Promise<TicketMessageResponse> {
+    return this.request(
+      `/author/tickets/${encodeURIComponent(ticketId)}/messages`,
+      {
+        method: "POST",
+        body: JSON.stringify(request),
+      },
+      ticketMessageResponseSchema
+    );
+  }
+
+  async addAuthorReply(ticketId: string, request: TicketReplyRequest): Promise<TicketMessageResponse> {
+    return this.replyToAuthorTicket(ticketId, request);
   }
 
   // Admin

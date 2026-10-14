@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import type { CurrentUser, LoginRequest } from "@bookleaf/contracts";
 import { getApiClient, type ApiClient, ApiClientError } from "../api";
+import { ticketEventManager } from "../api/events";
 
 interface AuthContextType {
   user: CurrentUser | null;
@@ -34,6 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; initialClient?:
       setUser(res.user);
     } catch (err) {
       setUser(null);
+      ticketEventManager.close();
       if (err instanceof ApiClientError && err.status === 401) {
         // Not logged in, normal state
       } else {
@@ -54,6 +56,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; initialClient?:
       setError(null);
       const res = await client.login(credentials);
       setUser(res.user);
+      ticketEventManager.init();
       return res.user;
     } catch (err) {
       const msg = err instanceof ApiClientError ? err.message : "Failed to log in. Please check your credentials.";
@@ -71,6 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; initialClient?:
     } catch (err) {
       console.warn("Logout error:", err);
     } finally {
+      ticketEventManager.close();
       setUser(null);
       setIsLoading(false);
     }
