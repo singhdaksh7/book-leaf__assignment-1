@@ -35,6 +35,28 @@ export class ApiClientError extends Error {
   }
 }
 
+export interface AttachmentMeta {
+  id: string;
+  ticketId: string;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface AttachmentResponse {
+  attachment: AttachmentMeta;
+}
+
+export interface AttachmentListResponse {
+  items: AttachmentMeta[];
+}
+
+export interface DownloadResult {
+  blob: Blob;
+  fileName: string;
+}
+
 export interface ApiClient {
   readonly isMock: boolean;
 
@@ -52,6 +74,11 @@ export interface ApiClient {
   getTicketById(ticketId: string): Promise<TicketDetailResponse>;
   createTicket(request: CreateTicketRequest): Promise<TicketResponse>;
 
+  // Author - Attachments
+  uploadAttachment(ticketId: string, file: File): Promise<AttachmentResponse>;
+  getAttachments(ticketId: string): Promise<AttachmentListResponse>;
+  downloadAttachment(ticketId: string, attachmentId: string, fallbackFileName?: string): Promise<DownloadResult>;
+
   // Admin (Contracts defined for seamless integration)
   getAdminTickets(filters?: TicketFilter): Promise<AdminQueueResponse>;
   getAdminTicketById(ticketId: string): Promise<AdminTicketDetailResponse>;
@@ -61,4 +88,8 @@ export interface ApiClient {
   assignTicket(ticketId: string, request: AssignTicketRequest): Promise<AssignmentResponse>;
   triggerAiAnalysis(ticketId: string): Promise<AiAnalysisRequestResponse>;
   getAiAnalysis(ticketId: string): Promise<AiAnalysisResponse>;
+
+  // Admin - Attachments
+  getAdminAttachments(ticketId: string): Promise<AttachmentListResponse>;
+  downloadAdminAttachment(ticketId: string, attachmentId: string, fallbackFileName?: string): Promise<DownloadResult>;
 }

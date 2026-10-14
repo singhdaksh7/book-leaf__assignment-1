@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { ArrowLeft, Send, Upload, Paperclip, X, Info } from "lucide-react";
+import { ArrowLeft, Send, Upload, Paperclip, X, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import type { Book } from "@bookleaf/contracts";
 import { Input, Textarea } from "../../components/common/Input";
@@ -8,6 +8,7 @@ import { Select } from "../../components/common/Select";
 import { Button } from "../../components/common/Button";
 import { Card, CardHeader, CardContent, CardFooter } from "../../components/common/Card";
 import { Alert } from "../../components/common/Alert";
+import { validateAttachmentFile, formatBytes } from "../../api/attachments";
 
 export const NewTicketPage: React.FC = () => {
   const { client } = useAuth();
@@ -21,6 +22,11 @@ export const NewTicketPage: React.FC = () => {
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [attachment, setAttachment] = useState<File | null>(null);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+
+  const [createdTicketId, setCreatedTicketId] = useState<string | null>(null);
+  const [partialSuccess, setPartialSuccess] = useState<{ ticketId: string; error: string } | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -56,28 +62,79 @@ export const NewTicketPage: React.FC = () => {
     return Object.keys(errs).length === 0;
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setAttachmentError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateAttachmentFile(file);
+    if (!validation.valid) {
+      setAttachmentError(validation.error || "Invalid attachment file.");
+      setAttachment(null);
+      e.target.value = "";
+      return;
+    }
+
+    setAttachment(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
     setSubmitError(null);
+    setPartialSuccess(null);
 
-    if (!validate()) return;
+    // If ticket was already created in partial success state, only retry attachment upload
+    if (!createdTicketId) {
+      if (!validate()) return;
+    }
+
+    if (attachment) {
+      const validation = validateAttachmentFile(attachment);
+      if (!validation.valid) {
+        setAttachmentError(validation.error || "Invalid attachment file.");
+        return;
+      }
+    }
 
     try {
       setIsSubmitting(true);
-      const res = await client.createTicket({
-        bookId: selectedBookId ? selectedBookId : null,
-        subject: subject.trim(),
-        description: description.trim(),
-      });
+      let ticketId = createdTicketId;
 
-      navigate(`/tickets/${res.ticket.id}`);
+      if (!ticketId) {
+        setUploadStatus("Creating support ticket...");
+        const res = await client.createTicket({
+          bookId: selectedBookId ? selectedBookId : null,
+          subject: subject.trim(),
+          description: description.trim(),
+        });
+        ticketId = res.ticket.id;
+        setCreatedTicketId(ticketId);
+      }
+
+      if (attachment && ticketId) {
+        setUploadStatus("Uploading attachment...");
+        try {
+          await client.uploadAttachment(ticketId, attachment);
+        } catch (uploadErr: any) {
+          // Ticket succeeded, attachment failed: do not report full failure
+          setPartialSuccess({
+            ticketId,
+            error: uploadErr.message || "Failed to upload attachment file to server.",
+          });
+          return;
+        }
+      }
+
+      navigate(`/tickets/${ticketId}`);
     } catch (err: any) {
       setSubmitError(err.message || "Failed to submit ticket. Please check input.");
     } finally {
       setIsSubmitting(false);
+      setUploadStatus(null);
     }
   };
+
 
   const bookOptions = [
     { value: "", label: "General / Account Level (No specific title)" },
@@ -114,6 +171,43 @@ export const NewTicketPage: React.FC = () => {
         </Alert>
       )}
 
+      {partialSuccess && (
+        <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-3" role="alert">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h3 className="font-semibold text-sm text-amber-900">
+                Ticket Created (Attachment Upload Failed)
+              </h3>
+              <p className="text-xs text-amber-800">
+                Ticket <strong>{partialSuccess.ticketId}</strong> was created successfully, but your attachment could not be uploaded:
+              </p>
+              <p className="text-xs font-mono bg-amber-100/80 p-2 rounded text-amber-950 border border-amber-200">
+                {partialSuccess.error}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 pt-1">
+            <Button
+              type="button"
+              variant="primary"
+              size="sm"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              isLoading={isSubmitting}
+            >
+              Retry Attachment Upload
+            </Button>
+            <Link
+              to={`/tickets/${partialSuccess.ticketId}`}
+              className="text-xs font-semibold text-stone-600 hover:text-stone-900 underline"
+            >
+              Continue to Ticket Without Attachment
+            </Link>
+          </div>
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} noValidate>
         <Card>
           <CardHeader
@@ -128,6 +222,7 @@ export const NewTicketPage: React.FC = () => {
                 label="Associated Title"
                 options={bookOptions}
                 value={selectedBookId}
+                disabled={Boolean(createdTicketId) || isSubmitting}
                 onChange={(e) => setSelectedBookId(e.target.value)}
                 helperText="Select a published book, or choose General/Account Level for tax, profile, or banking questions."
               />
@@ -140,6 +235,7 @@ export const NewTicketPage: React.FC = () => {
                 label="Subject Summary"
                 placeholder="e.g., Q1 Royalty payout clarification for print distributor sales"
                 value={subject}
+                disabled={Boolean(createdTicketId) || isSubmitting}
                 onChange={(e) => {
                   setSubject(e.target.value);
                   if (errors.subject) setErrors((prev) => ({ ...prev, subject: "" }));
@@ -158,6 +254,7 @@ export const NewTicketPage: React.FC = () => {
                 label="Detailed Description"
                 placeholder="Provide thorough context including dates, ISBN references, retailer channels, or specific queries..."
                 value={description}
+                disabled={Boolean(createdTicketId) || isSubmitting}
                 onChange={(e) => {
                   setDescription(e.target.value);
                   if (errors.description) setErrors((prev) => ({ ...prev, description: "" }));
@@ -168,7 +265,7 @@ export const NewTicketPage: React.FC = () => {
               />
             </div>
 
-            {/* Optional Attachment (UI scope per requirements) */}
+            {/* Optional Attachment */}
             <div className="pt-2 border-t border-stone-100">
               <label className="block text-xs font-semibold uppercase tracking-wider text-stone-600 mb-1.5">
                 Optional Attachment
@@ -180,44 +277,59 @@ export const NewTicketPage: React.FC = () => {
                     <Paperclip className="w-4 h-4 text-brand-600" />
                     <span className="font-medium text-stone-800">{attachment.name}</span>
                     <span className="text-stone-400">
-                      ({Math.round(attachment.size / 1024)} KB)
+                      ({formatBytes(attachment.size)})
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setAttachment(null)}
-                    className="p-1 text-stone-400 hover:text-red-500 rounded focus-ring"
-                    aria-label="Remove attachment"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  {!isSubmitting && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttachment(null);
+                        setAttachmentError(null);
+                      }}
+                      className="p-1 text-stone-400 hover:text-red-500 rounded focus-ring"
+                      aria-label="Remove attachment"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               ) : (
                 <label className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-stone-200 rounded-xl hover:border-brand-500 cursor-pointer transition-colors bg-stone-50/50">
                   <Upload className="w-5 h-5 text-stone-400 mb-2" />
                   <span className="text-xs font-semibold text-stone-700">
-                    Upload screenshot, PDF proof, or bank statement
+                    Upload screenshot, PDF proof, or text statement
                   </span>
                   <span className="text-[11px] text-stone-400 mt-0.5">
-                    PNG, JPG, PDF up to 10MB (Client-side attachment preview)
+                    PDF, PNG, JPG, WebP, Plain Text up to 5 MB
                   </span>
                   <input
                     type="file"
                     className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        setAttachment(e.target.files[0]);
-                      }
-                    }}
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,application/pdf,image/png,image/jpeg,image/webp,text/plain"
+                    disabled={isSubmitting}
+                    onChange={handleFileChange}
                   />
                 </label>
+              )}
+
+              {attachmentError && (
+                <p className="mt-1.5 text-xs text-red-600 font-medium" role="alert">
+                  {attachmentError}
+                </p>
+              )}
+
+              {uploadStatus && (
+                <p className="mt-2 text-xs text-brand-700 font-medium animate-pulse">
+                  {uploadStatus}
+                </p>
               )}
             </div>
           </CardContent>
 
           <CardFooter className="flex justify-between">
             <Link to="/tickets">
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" disabled={isSubmitting}>
                 Cancel
               </Button>
             </Link>
@@ -225,10 +337,15 @@ export const NewTicketPage: React.FC = () => {
               type="submit"
               variant="primary"
               size="md"
+              disabled={isSubmitting}
               isLoading={isSubmitting}
               rightIcon={<Send className="w-4 h-4" />}
             >
-              Submit Ticket
+              {createdTicketId
+                ? "Retry Attachment Upload"
+                : isSubmitting
+                ? uploadStatus || "Submitting..."
+                : "Submit Ticket"}
             </Button>
           </CardFooter>
         </Card>

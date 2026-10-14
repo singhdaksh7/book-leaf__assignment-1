@@ -16,6 +16,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import type { Ticket, AuthorTicketMessage } from "@bookleaf/contracts";
+import type { AttachmentMeta } from "../../api/client";
+import { formatBytes } from "../../api/attachments";
 import { StatusBadge, Badge } from "../../components/common/Badge";
 import { Button } from "../../components/common/Button";
 import { Card, CardHeader, CardContent, CardFooter } from "../../components/common/Card";
@@ -29,11 +31,14 @@ export const TicketDetailPage: React.FC = () => {
 
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [messages, setMessages] = useState<AuthorTicketMessage[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -44,10 +49,17 @@ export const TicketDetailPage: React.FC = () => {
       try {
         if (showRefreshIndicator) setIsRefreshing(true);
         setError(null);
-        const res = await client.getTicketById(ticketId);
-        setTicket(res.ticket);
+        const [ticketRes, attachmentsRes] = await Promise.all([
+          client.getTicketById(ticketId),
+          client.getAttachments(ticketId).catch((err) => {
+            console.warn("Could not load attachments for ticket:", err);
+            return { items: [] };
+          }),
+        ]);
+        setTicket(ticketRes.ticket);
         // Guarantee only author-visible messages are rendered
-        setMessages(res.messages.filter((m) => m.visibility === "AUTHOR"));
+        setMessages(ticketRes.messages.filter((m) => m.visibility === "AUTHOR"));
+        setAttachments(attachmentsRes.items);
       } catch (err: any) {
         setError(err.message || "Failed to load ticket conversation.");
       } finally {
@@ -57,6 +69,7 @@ export const TicketDetailPage: React.FC = () => {
     },
     [client, ticketId]
   );
+
 
   useEffect(() => {
     loadTicket();
@@ -114,9 +127,20 @@ export const TicketDetailPage: React.FC = () => {
     }
   };
 
-  const handleSimulatedDownload = (fileName: string) => {
-    setDownloadSuccess(`Downloading secure proof "${fileName}"...`);
-    setTimeout(() => setDownloadSuccess(null), 3000);
+  const handleDownload = async (attachment: AttachmentMeta) => {
+    if (!ticketId || downloadingId) return;
+    try {
+      setDownloadingId(attachment.id);
+      setDownloadError(null);
+      setDownloadSuccess(null);
+      const res = await client.downloadAttachment(ticketId, attachment.id, attachment.fileName);
+      setDownloadSuccess(`Downloaded "${res.fileName}" successfully.`);
+      setTimeout(() => setDownloadSuccess(null), 4000);
+    } catch (err: any) {
+      setDownloadError(err.message || `Failed to download ${attachment.fileName}.`);
+    } finally {
+      setDownloadingId(null);
+    }
   };
 
   if (isLoading) {
@@ -166,11 +190,18 @@ export const TicketDetailPage: React.FC = () => {
         </button>
       </div>
 
+      {downloadError && (
+        <Alert variant="error" title="Download Error">
+          {downloadError}
+        </Alert>
+      )}
+
       {downloadSuccess && (
         <Alert variant="info" title="Attachment Download">
           {downloadSuccess}
         </Alert>
       )}
+
 
       {/* Ticket Subject Card */}
       <Card className="shadow-card">
@@ -222,27 +253,67 @@ export const TicketDetailPage: React.FC = () => {
             </p>
           </div>
 
-          {/* Attachment display UI if present */}
-          <div className="pt-2 border-t border-stone-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-stone-500">
-              <Paperclip className="w-4 h-4 text-stone-400" />
-              <span>Attached Documents:</span>
-              <button
-                type="button"
-                onClick={() => handleSimulatedDownload("ticket_proof_spec.pdf")}
-                className="font-mono text-brand-700 hover:underline flex items-center gap-1 font-medium bg-stone-100 px-2 py-0.5 rounded"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                proof_spec_{ticket.id}.pdf
-              </button>
+          {/* Real Attachments Display */}
+          {attachments.length > 0 && (
+            <div className="pt-3 border-t border-stone-100 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-600">
+                <Paperclip className="w-4 h-4 text-brand-600" />
+                <span>Attached Documents ({attachments.length}):</span>
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="inline-flex items-center gap-2.5 px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs hover:border-stone-300 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-brand-600 shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-stone-800">{att.fileName}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-mono">
+                        {att.contentType && <span>{att.contentType}</span>}
+                        {att.sizeBytes && (
+                          <>
+                            <span>•</span>
+                            <span>{formatBytes(att.sizeBytes)}</span>
+                          </>
+                        )}
+                        {att.createdAt && (
+                          <>
+                            <span>•</span>
+                            <span>{new Date(att.createdAt).toLocaleDateString()}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(att)}
+                      disabled={downloadingId === att.id}
+                      className="ml-1 p-1 text-brand-700 hover:text-brand-900 hover:bg-stone-200/60 rounded transition-colors focus-ring"
+                      title={`Download ${att.fileName}`}
+                      aria-label={`Download ${att.fileName}`}
+                    >
+                      {downloadingId === att.id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-brand-600" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
+          )}
 
-            <div className="flex items-center gap-4 text-stone-400 font-mono text-[11px]">
+          <div className="pt-2 border-t border-stone-100 flex items-center justify-between text-xs text-stone-400 font-mono text-[11px]">
+            <span>Status: {ticket.status}</span>
+            <div className="flex items-center gap-4">
               <span>Created: {new Date(ticket.createdAt).toLocaleDateString()}</span>
               <span>•</span>
               <span>Updated: {new Date(ticket.updatedAt).toLocaleDateString()}</span>
             </div>
           </div>
+
         </CardContent>
       </Card>
 

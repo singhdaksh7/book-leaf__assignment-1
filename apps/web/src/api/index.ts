@@ -5,6 +5,7 @@ import { MockApiClient } from "./mock";
 export * from "./client";
 export * from "./http";
 export * from "./mock";
+export * from "./attachments";
 
 // Live backend is the production default.
 // Mock adapter is strictly isolated for development/testing when backend is offline.

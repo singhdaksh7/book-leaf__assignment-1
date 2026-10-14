@@ -36,7 +36,33 @@ import {
   type AiAnalysisResponse,
   type AiAnalysisRequestResponse,
 } from "@bookleaf/contracts";
-import { type ApiClient, ApiClientError } from "./client";
+import { z } from "zod";
+import {
+  type ApiClient,
+  ApiClientError,
+  type AttachmentResponse,
+  type AttachmentListResponse,
+  type DownloadResult,
+} from "./client";
+import { getAttachmentContentType, extractSafeFileName } from "./attachments";
+
+export const attachmentSchema = z.object({
+  id: z.string().min(1),
+  ticketId: z.string().min(1),
+  fileName: z.string(),
+  contentType: z.string(),
+  sizeBytes: z.number().int().min(1),
+  createdAt: z.string(),
+});
+
+export const attachmentResponseSchema = z.object({
+  attachment: attachmentSchema,
+});
+
+export const attachmentListResponseSchema = z.object({
+  items: z.array(attachmentSchema),
+});
+
 
 function getCsrfToken(): string | null {
   if (typeof document === "undefined") return null;
@@ -262,5 +288,124 @@ export class HttpApiClient implements ApiClient {
     return this.request(`/admin/tickets/${encodeURIComponent(ticketId)}/ai-analysis`, {
       method: "GET",
     }, aiAnalysisResponseSchema);
+  }
+
+  // Author - Attachments
+  async uploadAttachment(ticketId: string, file: File): Promise<AttachmentResponse> {
+    const contentType = getAttachmentContentType(file);
+    const filenameParam = encodeURIComponent(file.name);
+    const body = await file.arrayBuffer();
+
+    return this.request(
+      `/author/tickets/${encodeURIComponent(ticketId)}/attachments?filename=${filenameParam}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": contentType,
+        },
+        body,
+      },
+      attachmentResponseSchema
+    );
+  }
+
+  async getAttachments(ticketId: string): Promise<AttachmentListResponse> {
+    return this.request(
+      `/author/tickets/${encodeURIComponent(ticketId)}/attachments`,
+      { method: "GET" },
+      attachmentListResponseSchema
+    );
+  }
+
+  async downloadAttachment(ticketId: string, attachmentId: string, fallbackFileName?: string): Promise<DownloadResult> {
+    return this.downloadFile(
+      `/author/tickets/${encodeURIComponent(ticketId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      fallbackFileName || `attachment-${attachmentId}`
+    );
+  }
+
+  // Admin - Attachments
+  async getAdminAttachments(ticketId: string): Promise<AttachmentListResponse> {
+    return this.request(
+      `/admin/tickets/${encodeURIComponent(ticketId)}/attachments`,
+      { method: "GET" },
+      attachmentListResponseSchema
+    );
+  }
+
+  async downloadAdminAttachment(ticketId: string, attachmentId: string, fallbackFileName?: string): Promise<DownloadResult> {
+    return this.downloadFile(
+      `/admin/tickets/${encodeURIComponent(ticketId)}/attachments/${encodeURIComponent(attachmentId)}`,
+      fallbackFileName || `attachment-${attachmentId}`
+    );
+  }
+
+  private async downloadFile(path: string, fallbackFileName: string): Promise<DownloadResult> {
+    const url = `${this.baseUrl}${path.startsWith("/") ? path : `/${path}`}`;
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        method: "GET",
+        credentials: "include",
+      });
+    } catch (networkError) {
+      throw new ApiClientError(
+        "NETWORK_ERROR",
+        networkError instanceof Error ? networkError.message : "Failed to connect to BookLeaf server",
+        0
+      );
+    }
+
+    if (!response.ok) {
+      let data: unknown;
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+      } else {
+        const text = await response.text();
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
+      }
+
+      const parsedError = apiErrorSchema.safeParse(data);
+      if (parsedError.success) {
+        const { code, message, details, requestId } = parsedError.data.error;
+        throw new ApiClientError(code, message, response.status, details, requestId);
+      }
+      throw new ApiClientError(
+        `HTTP_${response.status}`,
+        typeof data === "string" ? data : `Attachment download failed with status ${response.status}`,
+        response.status
+      );
+    }
+
+    const disposition = response.headers.get("content-disposition");
+    const safeFileName = extractSafeFileName(disposition, fallbackFileName);
+    const blob = await response.blob();
+
+    if (typeof window !== "undefined" && typeof document !== "undefined" && typeof URL.createObjectURL === "function") {
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = safeFileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => {
+        if (typeof URL.revokeObjectURL === "function") {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }, 100);
+    }
+
+    return { blob, fileName: safeFileName };
   }
 }

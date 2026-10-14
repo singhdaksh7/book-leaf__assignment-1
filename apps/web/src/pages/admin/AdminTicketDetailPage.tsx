@@ -17,6 +17,8 @@ import {
   RefreshCw,
   FileText,
   Copy,
+  Paperclip,
+  Download,
 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import {
@@ -25,6 +27,8 @@ import {
   ticketPriorities,
   type AdminTicketDetailResponse,
 } from "@bookleaf/contracts";
+import type { AttachmentMeta } from "../../api/client";
+import { formatBytes } from "../../api/attachments";
 
 type TicketStatus = (typeof ticketStatuses)[number];
 type TicketCategory = (typeof ticketCategories)[number];
@@ -42,8 +46,13 @@ export const AdminTicketDetailPage: React.FC = () => {
   const { client, user } = useAuth();
 
   const [data, setData] = useState<AdminTicketDetailResponse | null>(null);
+  const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadSuccess, setDownloadSuccess] = useState<string | null>(null);
+
 
   // Form states
   const [replyBody, setReplyBody] = useState("");
@@ -66,8 +75,15 @@ export const AdminTicketDetailPage: React.FC = () => {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await client.getAdminTicketById(ticketId);
+      const [res, attachmentsRes] = await Promise.all([
+        client.getAdminTicketById(ticketId),
+        client.getAdminAttachments(ticketId).catch((err) => {
+          console.warn("Failed to load admin attachments:", err);
+          return { items: [] };
+        }),
+      ]);
       setData(res);
+      setAttachments(attachmentsRes.items);
       setSelectedStatus(res.ticket.status);
       setSelectedCategory(res.ticket.category || "");
       setSelectedPriority(res.ticket.priority || "");
@@ -81,6 +97,23 @@ export const AdminTicketDetailPage: React.FC = () => {
   useEffect(() => {
     loadTicket();
   }, [loadTicket]);
+
+  const handleDownload = async (attachment: AttachmentMeta) => {
+    if (!ticketId || downloadingId) return;
+    try {
+      setDownloadingId(attachment.id);
+      setDownloadError(null);
+      setDownloadSuccess(null);
+      const res = await client.downloadAdminAttachment(ticketId, attachment.id, attachment.fileName);
+      setDownloadSuccess(`Downloaded "${res.fileName}" successfully.`);
+      setTimeout(() => setDownloadSuccess(null), 4000);
+    } catch (err: any) {
+      setDownloadError(err.message || `Failed to download ${attachment.fileName}.`);
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
 
   // Send Author-Visible Public Reply
   const handleSendReply = async (e: React.FormEvent) => {
@@ -217,6 +250,18 @@ export const AdminTicketDetailPage: React.FC = () => {
         </span>
       </div>
 
+      {downloadError && (
+        <Alert variant="error" title="Download Failed">
+          {downloadError}
+        </Alert>
+      )}
+
+      {downloadSuccess && (
+        <Alert variant="info" title="Attachment Downloaded">
+          {downloadSuccess}
+        </Alert>
+      )}
+
       {/* Title & Status Summary Card */}
       <Card>
         <CardContent className="space-y-3">
@@ -243,8 +288,61 @@ export const AdminTicketDetailPage: React.FC = () => {
             </span>
             {ticket.description}
           </div>
+
+          {/* Real Attachments Display (Admin) */}
+          {attachments.length > 0 && (
+            <div className="pt-3 border-t border-stone-100 space-y-2">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-600">
+                <Paperclip className="w-4 h-4 text-brand-600" />
+                <span>Attached Documents ({attachments.length}):</span>
+              </div>
+              <div className="flex flex-wrap gap-2.5">
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="inline-flex items-center gap-2.5 px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-xs hover:border-stone-300 transition-colors"
+                  >
+                    <FileText className="w-4 h-4 text-brand-600 shrink-0" />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-stone-800">{att.fileName}</span>
+                      <div className="flex items-center gap-1.5 text-[10px] text-stone-400 font-mono">
+                        {att.contentType && <span>{att.contentType}</span>}
+                        {att.sizeBytes && (
+                          <>
+                            <span>•</span>
+                            <span>{formatBytes(att.sizeBytes)}</span>
+                          </>
+                        )}
+                        {att.createdAt && (
+                          <>
+                            <span>•</span>
+                            <span>{new Date(att.createdAt).toLocaleDateString()}</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(att)}
+                      disabled={downloadingId === att.id}
+                      className="ml-1 p-1 text-brand-700 hover:text-brand-900 hover:bg-stone-200/60 rounded transition-colors focus-ring"
+                      title={`Download ${att.fileName}`}
+                      aria-label={`Download ${att.fileName}`}
+                    >
+                      {downloadingId === att.id ? (
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-brand-600" />
+                      ) : (
+                        <Download className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
 
       {/* Main Two-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

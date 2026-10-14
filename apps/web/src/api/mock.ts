@@ -29,7 +29,15 @@ import type {
   AuditEvent,
   AiAnalysisAttempt,
 } from "@bookleaf/contracts";
-import { type ApiClient, ApiClientError } from "./client";
+import {
+  type ApiClient,
+  ApiClientError,
+  type AttachmentMeta,
+  type AttachmentResponse,
+  type AttachmentListResponse,
+  type DownloadResult,
+} from "./client";
+
 
 const SYNTHETIC_AUTHOR_USER: CurrentUser = {
   id: "usr_auth_01",
@@ -231,6 +239,19 @@ const INITIAL_MESSAGES: Record<string, AuthorTicketMessage[]> = {
   ],
 };
 
+const INITIAL_ATTACHMENTS: Record<string, AttachmentMeta[]> = {
+  tkt_synth_01: [
+    {
+      id: "att_synth_01",
+      ticketId: "tkt_synth_01",
+      fileName: "royalty_statement_q1.pdf",
+      contentType: "application/pdf",
+      sizeBytes: 245760,
+      createdAt: "2024-04-02T10:30:00Z",
+    },
+  ],
+};
+
 function delay(ms = 180): Promise<void> {
   if (typeof process !== "undefined" && (process.env?.NODE_ENV === "test" || process.env?.VITEST)) {
     return Promise.resolve();
@@ -245,7 +266,9 @@ export class MockApiClient implements ApiClient {
   private books: Book[] = [...INITIAL_BOOKS];
   private tickets: Ticket[] = [...INITIAL_TICKETS];
   private messages: Record<string, AuthorTicketMessage[]> = { ...INITIAL_MESSAGES };
+  private attachments: Record<string, AttachmentMeta[]> = { ...INITIAL_ATTACHMENTS };
   private internalNotes: Record<string, InternalNote[]> = {
+
     tkt_synth_01: [
       {
         id: "note_01",
@@ -569,5 +592,89 @@ export class MockApiClient implements ApiClient {
         createdAt: new Date().toISOString(),
       },
     };
+  }
+
+  // Author - Attachments
+  async uploadAttachment(ticketId: string, file: File): Promise<AttachmentResponse> {
+    await delay(200);
+    const ticket = this.tickets.find((t) => t.id === ticketId);
+    if (!ticket) {
+      throw new ApiClientError("NOT_FOUND", `Ticket with ID "${ticketId}" was not found`, 404);
+    }
+    if (ticket.status === "CLOSED") {
+      throw new ApiClientError("CONFLICT", "Closed tickets cannot receive attachments", 409);
+    }
+
+    const currentList = this.attachments[ticketId] || [];
+    if (currentList.length >= 5) {
+      throw new ApiClientError("CONFLICT", "A ticket can have at most 5 attachments", 409);
+    }
+
+    const attachment: AttachmentMeta = {
+      id: `att_${Date.now()}`,
+      ticketId,
+      fileName: file.name,
+      contentType: file.type || "application/pdf",
+      sizeBytes: file.size,
+      createdAt: new Date().toISOString(),
+    };
+
+    if (!this.attachments[ticketId]) {
+      this.attachments[ticketId] = [];
+    }
+    this.attachments[ticketId].push(attachment);
+
+    return { attachment };
+  }
+
+  async getAttachments(ticketId: string): Promise<AttachmentListResponse> {
+    await delay(100);
+    const ticket = this.tickets.find((t) => t.id === ticketId);
+    if (!ticket) {
+      throw new ApiClientError("NOT_FOUND", `Ticket with ID "${ticketId}" was not found`, 404);
+    }
+    return { items: this.attachments[ticketId] || [] };
+  }
+
+  async downloadAttachment(ticketId: string, attachmentId: string, fallbackFileName?: string): Promise<DownloadResult> {
+    await delay(150);
+    const list = this.attachments[ticketId] || [];
+    const att = list.find((a) => a.id === attachmentId);
+    if (!att) {
+      throw new ApiClientError("NOT_FOUND", "Attachment not found", 404);
+    }
+    const blob = new Blob(["mock attachment content"], { type: att.contentType });
+    const fileName = att.fileName || fallbackFileName || `attachment-${attachmentId}`;
+
+    if (typeof window !== "undefined" && typeof document !== "undefined" && typeof URL.createObjectURL === "function") {
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => {
+        if (typeof URL.revokeObjectURL === "function") {
+          URL.revokeObjectURL(objectUrl);
+        }
+      }, 100);
+    }
+
+    return { blob, fileName };
+  }
+
+  // Admin - Attachments
+  async getAdminAttachments(ticketId: string): Promise<AttachmentListResponse> {
+    await delay(100);
+    const ticket = this.tickets.find((t) => t.id === ticketId);
+    if (!ticket) {
+      throw new ApiClientError("NOT_FOUND", `Ticket with ID "${ticketId}" was not found`, 404);
+    }
+    return { items: this.attachments[ticketId] || [] };
+  }
+
+  async downloadAdminAttachment(ticketId: string, attachmentId: string, fallbackFileName?: string): Promise<DownloadResult> {
+    return this.downloadAttachment(ticketId, attachmentId, fallbackFileName);
   }
 }
