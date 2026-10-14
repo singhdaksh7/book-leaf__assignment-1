@@ -1,9 +1,18 @@
+import { strictIssues } from "./grounding-strict.js";
 export interface GroundingSource { text: string; }
 
-export type GroundingIssueKind = "ungrounded-number" | "ungrounded-date" | "completed-action";
+export type GroundingIssueKind =
+  | "ungrounded-number" | "ungrounded-date" | "completed-action"
+  // strict (author-facing drafts) only:
+  | "payout-promise" | "unsupported-link" | "unsupported-commitment";
+
+export interface GroundingOptions {
+  /** Author-facing drafts: also reject payout promises, links/contact details and refund/compensation commitments. */
+  strict?: boolean;
+}
 export interface GroundingIssue { kind: GroundingIssueKind; detail: string; }
 
-const MONTHS = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
+export const MONTHS = "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
 const DATE_PATTERNS: RegExp[] = [
   /\b\d{4}-\d{2}-\d{2}\b/g,
   /\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b/g,
@@ -27,7 +36,7 @@ const normDate = (d: string) => d.toLowerCase().replace(/(\d)(?:st|nd|rd|th)\b/g
 function numbersIn(text: string): Set<string> {
   return new Set((text.match(NUMBER) ?? []).map(normNumber));
 }
-function datesIn(text: string): string[] {
+export function datesIn(text: string): string[] {
   return DATE_PATTERNS.flatMap((re) => text.match(re) ?? []);
 }
 
@@ -36,7 +45,7 @@ function datesIn(text: string): string[] {
  * `sources` (ticket text, supplied book facts, retrieved policy), and the output must not claim actions already taken.
  * Schema validation cannot prove grounding; this is the cheap, model-free check applied to all generated text.
  */
-export function findUnsupportedClaims(output: string, sources: readonly GroundingSource[]): GroundingIssue[] {
+export function findUnsupportedClaims(output: string, sources: readonly GroundingSource[], options: GroundingOptions = {}): GroundingIssue[] {
   const corpus = sources.map((s) => s.text).join("\n");
   const allowedNumbers = numbersIn(corpus);
   const allowedDates = new Set(datesIn(corpus).map(normDate));
@@ -56,5 +65,6 @@ export function findUnsupportedClaims(output: string, sources: readonly Groundin
     const m = re.exec(output);
     if (m) issues.push({ kind: "completed-action", detail: m[0] });
   }
+  if (options.strict) issues.push(...strictIssues(output));
   return issues;
 }

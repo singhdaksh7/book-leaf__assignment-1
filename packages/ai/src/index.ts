@@ -16,3 +16,8 @@ export { detectInjection, sanitizeUntrusted } from "./safety.js";
 export { createTicketClassifier, type TicketClassifier, type TicketClassifierOptions, type TicketClassification, type ClassifyTicketInput } from "./classifier/classifier.js";
 export { modelClassificationSchema, parseModelClassification, type ModelClassification } from "./classifier/schema.js";
 export { DEFAULT_CLASSIFIER_LIMITS, type ClassifierLimits } from "./classifier/prompt.js";
+
+export { createResponseDrafter, type ResponseDrafter, type ResponseDrafterOptions, type ResponseDraft, type DraftTicketInput } from "./drafting/drafter.js";
+export { fallbackDraft, greetingName } from "./drafting/fallback.js";
+export { DEFAULT_DRAFTER_LIMITS, type DrafterLimits } from "./drafting/prompt.js";
+export { BookLeafAiService, createAiService, createAiServiceFromEnv, type AnalysisOutcome, type AnalysisMeta, type CreateAiServiceOptions } from "./service.js";
