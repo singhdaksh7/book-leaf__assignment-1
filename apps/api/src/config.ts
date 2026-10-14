@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { z } from "zod";
 
 const placeholderSecret = /replace-with|changeme|change-me|example/i;
@@ -14,7 +15,12 @@ const envSchema = z.object({
   /** "false" (default), "true", or a hop count when running behind a reverse proxy. */
   TRUST_PROXY: z.string().default("false"),
   LOGIN_MAX_FAILURES: z.coerce.number().int().min(1).default(10),
-  LOGIN_FAILURE_WINDOW_MINUTES: z.coerce.number().int().min(1).default(15)
+  LOGIN_FAILURE_WINDOW_MINUTES: z.coerce.number().int().min(1).default(15),
+  /** Directory for the local-disk attachment store. Must be outside any web-served path. */
+  ATTACHMENT_DIR: z.string().min(1).default("var/attachments"),
+  ATTACHMENT_MAX_BYTES: z.coerce.number().int().min(1).max(25 * 1024 * 1024).default(5 * 1024 * 1024),
+  ATTACHMENT_MAX_PER_TICKET: z.coerce.number().int().min(1).max(50).default(5),
+  TICKET_CREATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(30)
 });
 
 export interface AppConfig {
@@ -31,6 +37,11 @@ export interface AppConfig {
   trustProxy: boolean | number;
   loginMaxFailures: number;
   loginFailureWindowMs: number;
+  /** Absolute path of the attachment directory. */
+  attachmentDir: string;
+  attachmentMaxBytes: number;
+  attachmentMaxPerTicket: number;
+  ticketCreateLimitPerHour: number;
 }
 
 export class ConfigError extends Error {
@@ -64,6 +75,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: new URL(value.WEB_ORIGIN).origin,
     trustProxy,
     loginMaxFailures: value.LOGIN_MAX_FAILURES,
-    loginFailureWindowMs: value.LOGIN_FAILURE_WINDOW_MINUTES * 60_000
+    loginFailureWindowMs: value.LOGIN_FAILURE_WINDOW_MINUTES * 60_000,
+    attachmentDir: resolve(value.ATTACHMENT_DIR),
+    attachmentMaxBytes: value.ATTACHMENT_MAX_BYTES,
+    attachmentMaxPerTicket: value.ATTACHMENT_MAX_PER_TICKET,
+    ticketCreateLimitPerHour: value.TICKET_CREATE_LIMIT_PER_HOUR
   };
 }

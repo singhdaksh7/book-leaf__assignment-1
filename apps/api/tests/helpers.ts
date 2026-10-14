@@ -6,7 +6,7 @@ import request from "supertest";
 import { PrismaClient } from "@bookleaf/db";
 import { hashPassword } from "@bookleaf/db/password";
 import { importSeedData, parseSeedDataset } from "@bookleaf/db/seed";
-import { createApp } from "../src/app.js";
+import { createApp, type AppDependencies } from "../src/app.js";
 import { loadConfig, type AppConfig } from "../src/config.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -26,12 +26,12 @@ export function testConfig(overrides: Record<string, string> = {}): AppConfig {
   });
 }
 
-export function createTestApp(prisma: PrismaClient, overrides: Record<string, string> = {}): { app: Express; config: AppConfig } {
+export function createTestApp(prisma: PrismaClient, overrides: Record<string, string> = {}, extra: Partial<AppDependencies> = {}): { app: Express; config: AppConfig } {
   const config = testConfig(overrides);
-  return { app: createApp({ config, prisma, dummyHashCost: { memoryCost: 1024, timeCost: 2 } }), config };
+  return { app: createApp({ config, prisma, dummyHashCost: { memoryCost: 1024, timeCost: 2 }, ...extra }), config };
 }
 
-const tables = ["AuditLog", "AiAnalysis", "TicketAssignment", "InternalNote", "TicketMessage", "Ticket", "Session", "Book", "AuthorProfile", "User"];
+const tables = ["AuditLog", "AiAnalysis", "TicketAttachment", "TicketAssignment", "InternalNote", "TicketMessage", "Ticket", "Session", "Book", "AuthorProfile", "User"];
 export async function resetDatabase(prisma: PrismaClient): Promise<void> {
   await prisma.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
 }
@@ -66,4 +66,18 @@ export async function login(app: Express, config: AppConfig, email: string, pass
   if (response.status !== 200) throw new Error(`login failed with ${response.status}`);
   const csrf = cookieValue(response.headers["set-cookie"], config.csrfCookieName) as string;
   return { agent, csrf, response };
+}
+
+export type Client = Awaited<ReturnType<typeof login>>;
+
+/** Mutating request with the Origin and CSRF header a browser client would send. */
+export const mutate = (client: Client, method: "post" | "patch" | "put" | "delete", url: string) =>
+  client.agent[method](url).set("Origin", WEB_ORIGIN).set("X-CSRF-Token", client.csrf);
+
+export async function makeTicket(prisma: PrismaClient, authorId: string, data: Partial<Parameters<PrismaClient["ticket"]["create"]>[0]["data"]> = {}) {
+  return prisma.ticket.create({ data: { authorId, subject: "Synthetic subject", description: "Synthetic description text", ...data } as never });
+}
+
+export async function profileFor(prisma: PrismaClient, externalAuthorId: string) {
+  return prisma.authorProfile.findUniqueOrThrow({ where: { externalAuthorId } });
 }

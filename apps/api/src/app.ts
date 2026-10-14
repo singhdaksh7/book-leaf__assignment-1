@@ -10,19 +10,26 @@ import type { AppConfig } from "./config.js";
 import { AppError, errorBody, notFound } from "./http/errors.js";
 import { silentLogger, type Logger } from "./http/logger.js";
 import "./http/types.js";
+import { LocalDiskStorage, type AttachmentStorage } from "./attachments/storage.js";
+import { createAdminRouter } from "./routes/admin.js";
 import { createAuthorRouter } from "./routes/author.js";
+import type { TicketHooks } from "./tickets/hooks.js";
 
 export interface AppDependencies {
   config: AppConfig;
   prisma: PrismaClient;
   logger?: Logger;
+  /** Attachment store; defaults to local disk under config.attachmentDir. */
+  storage?: AttachmentStorage;
+  /** Post-commit extension points (AI analysis, events). */
+  hooks?: TicketHooks;
   /** Test hook: lower Argon2 cost for the login timing-equalisation hash. */
   dummyHashCost?: { memoryCost: number; timeCost: number };
 }
 
 const requestIdPattern = /^[A-Za-z0-9_-]{8,64}$/;
 
-export function createApp({ config, prisma, logger = silentLogger, dummyHashCost }: AppDependencies): Express {
+export function createApp({ config, prisma, logger = silentLogger, storage = new LocalDiskStorage(config.attachmentDir), hooks, dummyHashCost }: AppDependencies): Express {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.trustProxy);
@@ -67,7 +74,8 @@ export function createApp({ config, prisma, logger = silentLogger, dummyHashCost
   v1.use(authenticate(prisma, config));
   v1.use(csrfProtection(config));
   v1.use("/auth", createAuthRouter({ prisma, config, logger, dummyHashCost }));
-  v1.use("/author", createAuthorRouter(prisma));
+  v1.use("/author", createAuthorRouter({ prisma, config, storage, logger, hooks }));
+  v1.use("/admin", createAdminRouter({ prisma, storage }));
   v1.use((_req, _res, next) => next(notFound("Route not found")));
   app.use("/api/v1", v1);
   app.use((_req, _res, next) => next(notFound("Route not found")));

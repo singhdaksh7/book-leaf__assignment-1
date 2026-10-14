@@ -56,6 +56,7 @@ model User {
   auditLogs AuditLog[] @relation("AuditActor")
   assignmentsMade TicketAssignment[] @relation("AssignmentActor")
   assignmentsReceived TicketAssignment[] @relation("AssignmentAssignee")
+  attachments TicketAttachment[] @relation("AttachmentUploader")
 }
 
 model AuthorProfile {
@@ -125,6 +126,7 @@ model Ticket {
   internalNotes InternalNote[]
   assignments TicketAssignment[]
   aiAnalyses AiAnalysis[]
+  attachments TicketAttachment[]
   @@index([authorId, createdAt])
   @@index([bookId])
   @@index([assigneeId])
@@ -206,4 +208,22 @@ model AuditLog {
   actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
   @@index([entityType, entityId, createdAt])
   @@index([actorId, createdAt])
+}
+
+model TicketAttachment {
+  id String @id @default(cuid())
+  ticketId String
+  uploaderId String
+  // Sanitised display name only; never used to build a storage path.
+  fileName String
+  contentType String
+  sizeBytes Int
+  // Opaque server-generated storage key (not derived from user input).
+  storageKey String @unique
+  sha256 String
+  createdAt DateTime @default(now())
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploader User @relation("AttachmentUploader", fields: [uploaderId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
 }
