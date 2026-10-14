@@ -6,6 +6,8 @@ import { authorProfileId, requireAuthor } from "../auth/middleware.js";
 import { FailureLimiter } from "../auth/rateLimit.js";
 import { allowedAttachmentTypes, contentDisposition, validateUpload } from "../attachments/validate.js";
 import { newStorageKey, type AttachmentStorage } from "../attachments/storage.js";
+import type { AiAttemptService } from "../ai/attempts.js";
+import type { TicketEventHub } from "../events/hub.js";
 import type { AppConfig } from "../config.js";
 import { AppError, notFound } from "../http/errors.js";
 import type { Logger } from "../http/logger.js";
@@ -24,6 +26,9 @@ export interface AuthorRouterOptions {
   storage: AttachmentStorage;
   logger: Logger;
   hooks?: TicketHooks;
+  events: TicketEventHub;
+  /** Present only when analysis should start automatically for new tickets. */
+  ai?: AiAttemptService;
 }
 
 export async function sendAttachment(res: Response, storage: AttachmentStorage, attachment: { storageKey: string; fileName: string; contentType: string; sizeBytes: number }): Promise<void> {
@@ -38,7 +43,7 @@ export async function sendAttachment(res: Response, storage: AttachmentStorage, 
   res.end(data);
 }
 
-export function createAuthorRouter({ prisma, config, storage, logger, hooks }: AuthorRouterOptions): Router {
+export function createAuthorRouter({ prisma, config, storage, logger, hooks, events, ai }: AuthorRouterOptions): Router {
   const router = Router();
   router.use(requireAuthor);
   // Per-user creation throttle (in-memory, per process): counts successful creations in a rolling hour.
@@ -64,15 +69,22 @@ export function createAuthorRouter({ prisma, config, storage, logger, hooks }: A
 
     // Ownership is checked inside the same transaction as the insert, holding a share lock on the book row so it cannot be
     // deleted or reassigned in between. A database trigger enforces the same rule as a last line of defence.
-    const ticket = await prisma.$transaction(async (tx) => {
+    const { ticket, attemptId } = await prisma.$transaction(async (tx) => {
       if (input.bookId !== null) {
         const owned = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Book" WHERE "id" = ${input.bookId} AND "authorId" = ${authorId} FOR SHARE`;
         // Same answer for "does not exist" and "belongs to someone else": existence is not revealed.
         if (owned.length === 0) throw notFound("Book not found");
       }
-      return tx.ticket.create({ data: { authorId, bookId: input.bookId, subject: input.subject, description: input.description } });
+      const created = await tx.ticket.create({ data: { authorId, bookId: input.bookId, subject: input.subject, description: input.description } });
+      // The PENDING attempt commits with the ticket, so a crash can never leave a ticket whose analysis is silently lost.
+      const attempt = ai ? await ai.enqueue(tx, created.id) : null;
+      return { ticket: created, attemptId: attempt?.attempt.id ?? null };
     });
     createLimiter.recordFailure(limiterKey);
+
+    // After commit: nothing below can fail the request.
+    events.publish({ name: "ticket.created", ticketId: ticket.id, authorProfileId: authorId, audience: "all", occurredAt: ticket.updatedAt, version: ticket.updatedAt.toISOString() });
+    if (ai && attemptId) ai.kick(attemptId);
 
     // AI (or anything else) runs after commit and can never fail the request.
     void Promise.resolve().then(() => hooks?.onTicketCreated?.({ id: ticket.id, authorId })).catch((error: unknown) => {

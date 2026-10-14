@@ -16,11 +16,13 @@ export interface AuthRouterOptions {
   prisma: PrismaClient;
   config: AppConfig;
   logger: Logger;
+  /** Called after a session is revoked so open event streams bound to it are closed. */
+  onSessionEnded?: (sessionId: string) => void;
   /** Test hook: cheaper Argon2 parameters for the timing-equalising dummy hash only. Real hashes carry their own parameters. */
   dummyHashCost?: { memoryCost: number; timeCost: number };
 }
 
-export function createAuthRouter({ prisma, config, logger, dummyHashCost }: AuthRouterOptions): Router {
+export function createAuthRouter({ prisma, config, logger, onSessionEnded, dummyHashCost }: AuthRouterOptions): Router {
   const router = Router();
   const ipLimiter = new FailureLimiter(config.loginMaxFailures * 3, config.loginFailureWindowMs);
   const accountLimiter = new FailureLimiter(config.loginMaxFailures, config.loginFailureWindowMs);
@@ -71,6 +73,7 @@ export function createAuthRouter({ prisma, config, logger, dummyHashCost }: Auth
 
   router.post("/logout", requireAuth, asyncHandler(async (req, res) => {
     await revokeSession(prisma, req.auth!.sessionId);
+    onSessionEnded?.(req.auth!.sessionId);
     clearSessionCookies(res);
     res.status(204).end();
   }));

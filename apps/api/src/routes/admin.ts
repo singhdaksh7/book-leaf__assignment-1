@@ -1,16 +1,19 @@
 import { Router } from "express";
 import {
-  adminQueueResponseSchema, adminTicketDetailResponseSchema, ticketResponseSchema, updateTicketSchema
+  adminQueueResponseSchema, adminTicketDetailResponseSchema, aiAnalysisRequestResponseSchema, aiAnalysisResponseSchema, assignTicketSchema,
+  assignmentResponseSchema, internalNoteResponseSchema, internalNoteSchema, ticketMessageResponseSchema, ticketReplySchema, ticketResponseSchema, updateTicketSchema
 } from "@bookleaf/contracts";
-import { Prisma, type PrismaClient } from "@bookleaf/db";
+import { Prisma, type PrismaClient, type Ticket } from "@bookleaf/db";
+import type { AiAttemptService } from "../ai/attempts.js";
 import { requireRole } from "../auth/middleware.js";
 import type { AttachmentStorage } from "../attachments/storage.js";
-import { AppError, notFound } from "../http/errors.js";
+import type { TicketEventHub, TicketEventName } from "../events/hub.js";
+import { AppError, forbidden, notFound } from "../http/errors.js";
 import { asyncHandler, parseInput } from "../http/validate.js";
 import { serializeAuthorProfile, serializeBook } from "../serializers.js";
 import { filterWhere, parseTicketFilter } from "../tickets/filters.js";
 import {
-  attachmentListResponseSchema, serializeAiAttempt, serializeAssignment, serializeAttachment, serializeAuditEvent, serializeInternalNote,
+  attachmentListResponseSchema, serializeAiAttempt, serializeAssignment, serializeAuthorMessage, serializeAttachment, serializeAuditEvent, serializeInternalNote,
   serializeMessage, serializeTicket, serializeTicketSummary
 } from "../tickets/serializers.js";
 import { canTransition } from "../tickets/transitions.js";
@@ -19,12 +22,21 @@ import { sendAttachment } from "./author.js";
 export interface AdminRouterOptions {
   prisma: PrismaClient;
   storage: AttachmentStorage;
+  events: TicketEventHub;
+  ai: AiAttemptService;
+  /** Identical replies/notes from the same admin within this window are treated as a retry, not a new message. */
+  duplicateWindowMs?: number;
 }
 
 const unresolvedSql = Prisma.sql`"status" IN ('OPEN', 'IN_PROGRESS')`;
 
-export function createAdminRouter({ prisma, storage }: AdminRouterOptions): Router {
+export function createAdminRouter({ prisma, storage, events, ai, duplicateWindowMs = 60_000 }: AdminRouterOptions): Router {
   const router = Router();
+
+  const announce = (name: TicketEventName, ticket: Pick<Ticket, "id" | "authorId" | "updatedAt">, audience: "all" | "admin" = "all") =>
+    events.publish({ name, ticketId: ticket.id, authorProfileId: ticket.authorId, audience, occurredAt: ticket.updatedAt, version: ticket.updatedAt.toISOString() });
+  /** Moves updatedAt so pollers and SSE catch-up see the change. */
+  const touch = (tx: Prisma.TransactionClient, ticketId: string) => tx.ticket.update({ where: { id: ticketId }, data: { updatedAt: new Date() } });
   router.use(requireRole("ADMIN"));
 
   /**
@@ -87,7 +99,7 @@ export function createAdminRouter({ prisma, storage }: AdminRouterOptions): Rout
     const ticketId = req.params.ticketId as string;
     const actorId = req.auth!.user.id;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
       if (locked.length === 0) throw notFound("Ticket not found");
       const current = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
@@ -100,7 +112,7 @@ export function createAdminRouter({ prisma, storage }: AdminRouterOptions): Rout
       if (input.category !== undefined && input.category !== current.category) changes.push({ field: "category", before: current.category, after: input.category });
       if (input.priority !== undefined && input.priority !== current.priority) changes.push({ field: "priority", before: current.priority, after: input.priority });
 
-      if (changes.length === 0) return current;
+      if (changes.length === 0) return { ticket: current, changed: false };
       if (current.status === "CLOSED") throw new AppError("CONFLICT", "Closed tickets cannot be modified");
 
       const ticket = await tx.ticket.update({
@@ -114,9 +126,113 @@ export function createAdminRouter({ prisma, storage }: AdminRouterOptions): Rout
           before: { [change.field]: change.before }, after: { [change.field]: change.after }, requestId: req.requestId
         }))
       });
-      return ticket;
+      return { ticket, changed: true };
     });
-    res.status(200).json(ticketResponseSchema.parse({ ticket: serializeTicket(updated) }));
+    if (result.changed) announce("ticket.updated", result.ticket);
+    res.status(200).json(ticketResponseSchema.parse({ ticket: serializeTicket(result.ticket) }));
+  }));
+
+  /**
+   * Explicit admin send action: the only way a message becomes visible to an author. The body is whatever the admin submits
+   * (an AI draft is only ever suggestion data). An identical message from the same admin within the duplicate window is a
+   * retry and returns the original message instead of sending twice.
+   */
+  router.post("/tickets/:ticketId/replies", asyncHandler(async (req, res) => {
+    const input = parseInput(ticketReplySchema, req.body, "reply");
+    const ticketId = req.params.ticketId as string;
+    const actorId = req.auth!.user.id;
+    const result = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string; status: string }[]>`SELECT "id", "status" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
+      if (!locked[0]) throw notFound("Ticket not found");
+      if (locked[0].status === "CLOSED") throw new AppError("CONFLICT", "Closed tickets cannot receive replies");
+      const duplicate = await tx.ticketMessage.findFirst({
+        where: { ticketId, authorId: actorId, visibility: "AUTHOR", body: input.body, createdAt: { gte: new Date(Date.now() - duplicateWindowMs) } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+      });
+      if (duplicate) return { message: duplicate, ticket: null };
+      const message = await tx.ticketMessage.create({ data: { ticketId, authorId: actorId, body: input.body, visibility: "AUTHOR" } });
+      const ticket = await touch(tx, ticketId);
+      await tx.auditLog.create({
+        data: { actorId, action: "ticket.reply.created", entityType: "Ticket", entityId: ticketId, after: { messageId: message.id, visibility: "AUTHOR" }, requestId: req.requestId }
+      });
+      return { message, ticket };
+    });
+    if (result.ticket) announce("ticket.reply.created", result.ticket);
+    res.status(201).json(ticketMessageResponseSchema.parse({ message: serializeAuthorMessage(result.message) }));
+  }));
+
+  /** Admin-only and immutable. Never loaded by an author route; no author-facing event is emitted. */
+  router.post("/tickets/:ticketId/internal-notes", asyncHandler(async (req, res) => {
+    const input = parseInput(internalNoteSchema, req.body, "internal note");
+    const ticketId = req.params.ticketId as string;
+    const actorId = req.auth!.user.id;
+    const result = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string; authorId: string }[]>`SELECT "id", "authorId" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
+      if (!locked[0]) throw notFound("Ticket not found");
+      const duplicate = await tx.internalNote.findFirst({
+        where: { ticketId, authorId: actorId, body: input.body, createdAt: { gte: new Date(Date.now() - duplicateWindowMs) } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+      });
+      if (duplicate) return { note: duplicate, created: false, authorProfileId: locked[0].authorId };
+      const note = await tx.internalNote.create({ data: { ticketId, authorId: actorId, body: input.body } });
+      await tx.auditLog.create({
+        data: { actorId, action: "ticket.internal_note.created", entityType: "Ticket", entityId: ticketId, after: { noteId: note.id }, requestId: req.requestId }
+      });
+      return { note, created: true, authorProfileId: locked[0].authorId };
+    });
+    // Admin-audience only, stamped now: a note must never look like a ticket change to the author.
+    if (result.created) announce("ticket.updated", { id: ticketId, authorId: result.authorProfileId, updatedAt: new Date() }, "admin");
+    res.status(201).json(internalNoteResponseSchema.parse({ note: serializeInternalNote(result.note) }));
+  }));
+
+  /** Assign-to-self (or unassign). Admins cannot assign work to someone else through this endpoint. */
+  router.put("/tickets/:ticketId/assignment", asyncHandler(async (req, res) => {
+    const input = parseInput(assignTicketSchema, req.body, "assignment");
+    const ticketId = req.params.ticketId as string;
+    const actorId = req.auth!.user.id;
+    if (input.assigneeId !== null && input.assigneeId !== actorId) throw forbidden("Tickets can only be assigned to yourself");
+
+    const result = await prisma.$transaction(async (tx) => {
+      const locked = await tx.$queryRaw<{ id: string }[]>`SELECT "id" FROM "Ticket" WHERE "id" = ${ticketId} FOR UPDATE`;
+      if (!locked[0]) throw notFound("Ticket not found");
+      const current = await tx.ticket.findUniqueOrThrow({ where: { id: ticketId } });
+      if (current.status === "CLOSED") throw new AppError("CONFLICT", "Closed tickets cannot be reassigned");
+      const latest = await tx.ticketAssignment.findFirst({ where: { ticketId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+      if (current.assigneeId === input.assigneeId) {
+        // Idempotent repeat: report existing state without writing history or audit noise.
+        if (!latest) throw new AppError("CONFLICT", "Ticket is not assigned");
+        return { ticket: current, assignment: latest, changed: false };
+      }
+      const assignment = await tx.ticketAssignment.create({ data: { ticketId, assigneeId: input.assigneeId, assignedById: actorId } });
+      const ticket = await tx.ticket.update({ where: { id: ticketId }, data: { assigneeId: input.assigneeId } });
+      await tx.auditLog.create({
+        data: {
+          actorId, action: "ticket.assignment.updated", entityType: "Ticket", entityId: ticketId,
+          before: { assigneeId: current.assigneeId }, after: { assigneeId: input.assigneeId }, requestId: req.requestId
+        }
+      });
+      return { ticket, assignment, changed: true };
+    });
+    if (result.changed) announce("ticket.updated", result.ticket);
+    res.status(200).json(assignmentResponseSchema.parse({ ticket: serializeTicket(result.ticket), assignment: serializeAssignment(result.assignment) }));
+  }));
+
+  /** Latest attempt (admin only). Drafts and metadata never appear on author routes. */
+  router.get("/tickets/:ticketId/ai-analysis", asyncHandler(async (req, res) => {
+    const ticket = await prisma.ticket.findUnique({ where: { id: req.params.ticketId }, select: { id: true } });
+    if (!ticket) throw notFound("Ticket not found");
+    const latest = await prisma.aiAnalysis.findFirst({ where: { ticketId: ticket.id }, orderBy: [{ createdAt: "desc" }, { id: "desc" }] });
+    res.status(200).json(aiAnalysisResponseSchema.parse({ analysis: latest ? serializeAiAttempt(latest) : null }));
+  }));
+
+  /** Starts (or joins) an analysis. 202 while pending, 200 when the returned attempt is already terminal. Never sends anything. */
+  router.post("/tickets/:ticketId/ai-analysis", asyncHandler(async (req, res) => {
+    const result = await ai.requestRefresh(req.params.ticketId as string, { actorId: req.auth!.user.id, requestId: req.requestId });
+    if (!result) throw notFound("Ticket not found");
+    if (result.ticketStatus === "CLOSED") throw new AppError("CONFLICT", "Closed tickets cannot be analysed");
+    if (result.created) ai.kick(result.attempt.id);
+    const attempt = serializeAiAttempt(result.attempt);
+    res.status(attempt.status === "PENDING" ? 202 : 200).json(aiAnalysisRequestResponseSchema.parse({ analysis: attempt }));
   }));
 
   router.get("/tickets/:ticketId/attachments", asyncHandler(async (req, res) => {

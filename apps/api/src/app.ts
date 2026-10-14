@@ -13,6 +13,10 @@ import "./http/types.js";
 import { LocalDiskStorage, type AttachmentStorage } from "./attachments/storage.js";
 import { createAdminRouter } from "./routes/admin.js";
 import { createAuthorRouter } from "./routes/author.js";
+import { createEventsRouter } from "./routes/events.js";
+import { AiAttemptService } from "./ai/attempts.js";
+import { createUnavailableEngine } from "./ai/engine.js";
+import { TicketEventHub } from "./events/hub.js";
 import type { TicketHooks } from "./tickets/hooks.js";
 
 export interface AppDependencies {
@@ -21,15 +25,21 @@ export interface AppDependencies {
   logger?: Logger;
   /** Attachment store; defaults to local disk under config.attachmentDir. */
   storage?: AttachmentStorage;
-  /** Post-commit extension points (AI analysis, events). */
+  /** Post-commit extension points. */
   hooks?: TicketHooks;
+  /** AI attempt service. When provided, every new ticket gets a durable PENDING attempt and is analysed in the background. */
+  ai?: AiAttemptService;
+  /** Event hub shared with the AI service so analysis completion reaches admin streams. */
+  events?: TicketEventHub;
+  /** SSE keep-alive/session re-validation period (tests shorten it). */
+  sseHeartbeatMs?: number;
   /** Test hook: lower Argon2 cost for the login timing-equalisation hash. */
   dummyHashCost?: { memoryCost: number; timeCost: number };
 }
 
 const requestIdPattern = /^[A-Za-z0-9_-]{8,64}$/;
 
-export function createApp({ config, prisma, logger = silentLogger, storage = new LocalDiskStorage(config.attachmentDir), hooks, dummyHashCost }: AppDependencies): Express {
+export function createApp({ config, prisma, logger = silentLogger, storage = new LocalDiskStorage(config.attachmentDir), hooks, ai, events = new TicketEventHub(), sseHeartbeatMs, dummyHashCost }: AppDependencies): Express {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.trustProxy);
@@ -73,14 +83,23 @@ export function createApp({ config, prisma, logger = silentLogger, storage = new
   v1.use(noStore);
   v1.use(authenticate(prisma, config));
   v1.use(csrfProtection(config));
-  v1.use("/auth", createAuthRouter({ prisma, config, logger, dummyHashCost }));
-  v1.use("/author", createAuthorRouter({ prisma, config, storage, logger, hooks }));
-  v1.use("/admin", createAdminRouter({ prisma, storage }));
+  // Without an injected service, admin-requested analyses still work but record "not configured"; nothing runs on ticket creation.
+  const aiService = ai ?? new AiAttemptService({ prisma, engine: createUnavailableEngine(), events, logger });
+  v1.use("/auth", createAuthRouter({ prisma, config, logger, onSessionEnded: (id) => events.closeSession(id), dummyHashCost }));
+  v1.use("/author", createAuthorRouter({ prisma, config, storage, logger, hooks, events, ai }));
+  v1.use("/admin", createAdminRouter({ prisma, storage, events, ai: aiService }));
+  v1.use("/events", createEventsRouter({ prisma, hub: events, heartbeatMs: sseHeartbeatMs }));
   v1.use((_req, _res, next) => next(notFound("Route not found")));
   app.use("/api/v1", v1);
   app.use((_req, _res, next) => next(notFound("Route not found")));
 
   const errorHandler: ErrorRequestHandler = (err: unknown, req, res, _next) => {
+    if (res.headersSent) {
+      // A stream (SSE) or partial response is already on the wire: nothing safe can be added.
+      logger.log("error", "error after headers sent", { requestId: req.requestId, errorName: err instanceof Error ? err.name : typeof err });
+      res.end();
+      return;
+    }
     let appError: AppError;
     if (err instanceof AppError) {
       appError = err;

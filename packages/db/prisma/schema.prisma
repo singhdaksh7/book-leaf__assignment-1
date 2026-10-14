@@ -193,6 +193,7 @@ model AiAnalysis {
   createdAt DateTime @default(now())
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   @@index([ticketId, createdAt, id])
+  @@index([status, createdAt])
 }
 
 model AuditLog {
