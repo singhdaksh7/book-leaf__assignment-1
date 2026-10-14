@@ -6,12 +6,17 @@ import type { AuthContext } from "../http/types.js";
 export const generateSessionToken = (): string => randomBytes(32).toString("base64url");
 export const hashSessionToken = (token: string): string => createHash("sha256").update(token).digest("hex");
 
+/** Live sessions kept per user; a new login beyond this revokes the oldest. */
+export const MAX_SESSIONS_PER_USER = 10;
+
 export async function createSession(prisma: PrismaClient, userId: string, ttlMs: number): Promise<{ token: string; sessionId: string; expiresAt: Date }> {
   const token = generateSessionToken();
   const expiresAt = new Date(Date.now() + ttlMs);
   const session = await prisma.session.create({ data: { tokenHash: hashSessionToken(token), userId, expiresAt } });
-  // Opportunistic cleanup keeps the table small without a scheduler.
-  await prisma.session.deleteMany({ where: { userId, expiresAt: { lt: new Date() } } });
+  // Opportunistic cleanup keeps the table small without a scheduler: drop expired sessions and cap live ones per user
+  // (the oldest are revoked first; their event streams close at the next heartbeat).
+  const keep = await prisma.session.findMany({ where: { userId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: MAX_SESSIONS_PER_USER, select: { id: true } });
+  await prisma.session.deleteMany({ where: { userId, OR: [{ expiresAt: { lt: new Date() } }, { id: { notIn: keep.map((s) => s.id) } }] } });
   return { token, sessionId: session.id, expiresAt };
 }
 

@@ -45,7 +45,7 @@ export default async function setup(): Promise<() => Promise<void>> {
 
   const dir = mkdtempSync(join(tmpdir(), "bookleaf-pg-"));
   const port = await freePort();
-  const pg = new EmbeddedPostgres({ databaseDir: dir, user: "bookleaf", password: "bookleaf", port, persistent: false, onLog: () => {}, onError: () => {} });
+  const pg = new EmbeddedPostgres({ databaseDir: dir, user: "bookleaf", password: "bookleaf", port, persistent: false, initdbFlags: ["--encoding=UTF8", "--locale=C"], onLog: () => {}, onError: () => {} });
   await pg.initialise();
   await pg.start();
   await pg.createDatabase("bookleaf_test");

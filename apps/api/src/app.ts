@@ -33,13 +33,15 @@ export interface AppDependencies {
   events?: TicketEventHub;
   /** SSE keep-alive/session re-validation period (tests shorten it). */
   sseHeartbeatMs?: number;
+  /** Max tickets replayed after an SSE reconnect (tests lower it). */
+  sseCatchUpLimit?: number;
   /** Test hook: lower Argon2 cost for the login timing-equalisation hash. */
   dummyHashCost?: { memoryCost: number; timeCost: number };
 }
 
 const requestIdPattern = /^[A-Za-z0-9_-]{8,64}$/;
 
-export function createApp({ config, prisma, logger = silentLogger, storage = new LocalDiskStorage(config.attachmentDir), hooks, ai, events = new TicketEventHub(), sseHeartbeatMs, dummyHashCost }: AppDependencies): Express {
+export function createApp({ config, prisma, logger = silentLogger, storage = new LocalDiskStorage(config.attachmentDir), hooks, ai, events = new TicketEventHub(), sseHeartbeatMs, sseCatchUpLimit, dummyHashCost }: AppDependencies): Express {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", config.trustProxy);
@@ -88,7 +90,7 @@ export function createApp({ config, prisma, logger = silentLogger, storage = new
   v1.use("/auth", createAuthRouter({ prisma, config, logger, onSessionEnded: (id) => events.closeSession(id), dummyHashCost }));
   v1.use("/author", createAuthorRouter({ prisma, config, storage, logger, hooks, events, ai }));
   v1.use("/admin", createAdminRouter({ prisma, storage, events, ai: aiService }));
-  v1.use("/events", createEventsRouter({ prisma, hub: events, heartbeatMs: sseHeartbeatMs }));
+  v1.use("/events", createEventsRouter({ prisma, hub: events, heartbeatMs: sseHeartbeatMs, catchUpLimit: sseCatchUpLimit }));
   v1.use((_req, _res, next) => next(notFound("Route not found")));
   app.use("/api/v1", v1);
   app.use((_req, _res, next) => next(notFound("Route not found")));

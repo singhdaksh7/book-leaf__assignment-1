@@ -7,6 +7,7 @@ import { AiAttemptService } from "./ai/attempts.js";
 import { loadPackageEngine } from "./ai/engine.js";
 import { TicketEventHub } from "./events/hub.js";
 import { ConfigError, loadConfig } from "./config.js";
+import { assertUtf8Database, DatabaseEncodingError } from "./db-check.js";
 import { createLogger } from "./http/logger.js";
 
 // Local development convenience: load apps/api/.env if present. Real environments inject variables directly.
@@ -20,6 +21,7 @@ async function main(): Promise<void> {
   // The Prisma client reads DATABASE_URL itself; config validated it is present.
   const prisma = new PrismaClient({ datasourceUrl: config.databaseUrl });
   await prisma.$connect();
+  await assertUtf8Database(prisma);
 
   // AI is optional: if the package or its configuration is unavailable the engine records safe FAILED attempts.
   const events = new TicketEventHub();
@@ -45,9 +47,18 @@ async function main(): Promise<void> {
   process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
+// Last-resort handlers: log the error class only (messages can embed query values), then fail fast on a corrupt process.
+process.on("unhandledRejection", (reason) => {
+  logger.log("error", "unhandled rejection", { errorName: reason instanceof Error ? reason.name : typeof reason });
+});
+process.on("uncaughtException", (error) => {
+  logger.log("error", "uncaught exception", { errorName: error.name });
+  process.exit(1);
+});
+
 main().catch((error: unknown) => {
   // Config errors list variable names only; anything else is reduced to its class name.
-  if (error instanceof ConfigError) logger.log("error", error.message);
+  if (error instanceof ConfigError || error instanceof DatabaseEncodingError) logger.log("error", error.message);
   else logger.log("error", "startup failed", { errorName: error instanceof Error ? error.name : "unknown" });
   process.exit(1);
 });

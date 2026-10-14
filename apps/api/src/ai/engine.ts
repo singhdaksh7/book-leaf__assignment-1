@@ -88,7 +88,10 @@ export function createEngineFromModule(mod: unknown, env: Record<string, string 
   const call = <T>(name: string, ...args: unknown[]): T => (m[name] as (...a: unknown[]) => T)(...args);
 
   const UsageTracker = m.UsageTracker as (new () => unknown) | undefined;
-  const aiLogger = { log: (level: "info" | "warn" | "error", message: string, fields?: Record<string, string | number | boolean | null | undefined>) => logger.log(level, `ai: ${message}`, fields) };
+  // The package's AiLogger is `{ warn(event, meta) }` and nothing else. It receives codes and counters only.
+  const aiLogger = {
+    warn: (event: string, meta?: Record<string, string | number | boolean>) => logger.log("warn", `ai: ${event}`, meta)
+  };
   const service = call<unknown>("createAiServiceFromEnv", env, { ...(UsageTracker ? { usageTracker: new UsageTracker() } : {}), logger: aiLogger });
 
   let timing: unknown = defaultTiming;

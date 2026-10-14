@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import express, { Router, type Response } from "express";
-import { bookListResponseSchema, createTicketSchema, ticketDetailResponseSchema, ticketFilterSchema, ticketListResponseSchema, ticketResponseSchema } from "@bookleaf/contracts";
+import { bookListResponseSchema, bookSchema, createTicketSchema, ticketDetailResponseSchema, ticketFilterSchema, ticketListResponseSchema, ticketMessageResponseSchema, ticketReplySchema, ticketResponseSchema } from "@bookleaf/contracts";
+import { z } from "zod";
 import type { PrismaClient } from "@bookleaf/db";
 import { authorProfileId, requireAuthor } from "../auth/middleware.js";
 import { FailureLimiter } from "../auth/rateLimit.js";
@@ -19,6 +20,8 @@ import { attachmentListResponseSchema, attachmentResponseSchema, serializeAttach
 
 /** Book requests accept pagination only; unknown query keys are rejected rather than silently ignored. */
 const bookQuerySchema = ticketFilterSchema.pick({ page: true, pageSize: true }).strict();
+/** Detail routes take no query parameters; stray ones are rejected rather than silently ignored. */
+const noQuerySchema = z.object({}).strict();
 
 export interface AuthorRouterOptions {
   prisma: PrismaClient;
@@ -48,6 +51,7 @@ export function createAuthorRouter({ prisma, config, storage, logger, hooks, eve
   router.use(requireAuthor);
   // Per-user creation throttle (in-memory, per process): counts successful creations in a rolling hour.
   const createLimiter = new FailureLimiter(config.ticketCreateLimitPerHour, 3_600_000);
+  const replyLimiter = new FailureLimiter(config.authorReplyLimitPerHour, 3_600_000);
 
   router.get("/books", asyncHandler(async (req, res) => {
     const { page, pageSize } = parseInput(bookQuerySchema, req.query, "query");
@@ -58,6 +62,14 @@ export function createAuthorRouter({ prisma, config, storage, logger, hooks, eve
       prisma.book.findMany({ where, orderBy: [{ externalBookId: "asc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize })
     ]);
     res.status(200).json(bookListResponseSchema.parse({ items: books.map(serializeBook), page, pageSize, total }));
+  }));
+
+  /** One of the caller's own books. Ownership is part of the query, so another author's id is indistinguishable from a missing one. */
+  router.get("/books/:bookId", asyncHandler(async (req, res) => {
+    parseInput(noQuerySchema, req.query, "query");
+    const book = await prisma.book.findFirst({ where: { id: req.params.bookId, authorId: authorProfileId(req) } });
+    if (!book) throw notFound("Book not found");
+    res.status(200).json(bookSchema.parse(serializeBook(book)));
   }));
 
   router.post("/tickets", asyncHandler(async (req, res) => {
@@ -111,6 +123,45 @@ export function createAuthorRouter({ prisma, config, storage, logger, hooks, eve
     // Only AUTHOR-visible messages are queried; internal notes are never loaded on author routes.
     const messages = await prisma.ticketMessage.findMany({ where: { ticketId: ticket.id, visibility: "AUTHOR" }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
     res.status(200).json(ticketDetailResponseSchema.parse({ ticket: serializeTicket(ticket), messages: messages.map(serializeAuthorMessage) }));
+  }));
+
+  /**
+   * An author's reply in their own conversation. Always an AUTHOR-visible message written by the caller: the request schema has
+   * no visibility, note or AI field, and unknown fields are ignored, so an author cannot create an internal note, an admin-only
+   * message or an AI draft through this route. The message, the ticket's updatedAt bump and the audit row commit together.
+   * An identical message from the same author within the duplicate window is a retry and returns the original.
+   */
+  router.post("/tickets/:ticketId/messages", asyncHandler(async (req, res) => {
+    const authorId = authorProfileId(req);
+    const userId = req.auth!.user.id;
+    const ticketId = req.params.ticketId as string;
+    const input = parseInput(ticketReplySchema, req.body, "message");
+    const limiterKey = `reply:${userId}`;
+    const retryAfter = replyLimiter.retryAfterSeconds(limiterKey);
+    if (retryAfter > 0) throw new AppError("RATE_LIMITED", "Too many messages sent recently. Try again later.", undefined, { "Retry-After": String(retryAfter) });
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Ownership is part of the lock query: a foreign or missing ticket yields no row and the same 404.
+      const locked = await tx.$queryRaw<{ id: string; status: string }[]>`SELECT "id", "status" FROM "Ticket" WHERE "id" = ${ticketId} AND "authorId" = ${authorId} FOR UPDATE`;
+      if (!locked[0]) throw notFound("Ticket not found");
+      if (locked[0].status === "CLOSED") throw new AppError("CONFLICT", "Closed tickets cannot receive replies");
+      const duplicate = await tx.ticketMessage.findFirst({
+        where: { ticketId, authorId: userId, visibility: "AUTHOR", body: input.body, createdAt: { gte: new Date(Date.now() - 60_000) } },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }]
+      });
+      if (duplicate) return { message: duplicate, ticket: null };
+      const message = await tx.ticketMessage.create({ data: { ticketId, authorId: userId, body: input.body, visibility: "AUTHOR" } });
+      const ticket = await tx.ticket.update({ where: { id: ticketId }, data: { updatedAt: new Date() } });
+      await tx.auditLog.create({
+        data: { actorId: userId, action: "ticket.author_reply.created", entityType: "Ticket", entityId: ticketId, after: { messageId: message.id, visibility: "AUTHOR" }, requestId: req.requestId }
+      });
+      return { message, ticket };
+    });
+    if (result.ticket) {
+      replyLimiter.recordFailure(limiterKey);
+      events.publish({ name: "ticket.reply.created", ticketId, authorProfileId: authorId, audience: "all", occurredAt: result.ticket.updatedAt, version: result.ticket.updatedAt.toISOString() });
+    }
+    res.status(201).json(ticketMessageResponseSchema.parse({ message: serializeAuthorMessage(result.message) }));
   }));
 
   // --- Attachments (not in the frozen contract; proposal reported to the controller) ---

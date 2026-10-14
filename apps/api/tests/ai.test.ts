@@ -379,7 +379,14 @@ describe("engine adapter for @bookleaf/ai", () => {
   const fakeModule = () => {
     const calls: Array<{ name: string; args: unknown[] }> = [];
     const mod = {
-      createAiServiceFromEnv: (...args: unknown[]) => { calls.push({ name: "createAiServiceFromEnv", args }); return { service: true }; },
+      createAiServiceFromEnv: (...args: unknown[]) => {
+        calls.push({ name: "createAiServiceFromEnv", args });
+        // Mirror the package's AiLogger contract exactly: only warn(event, meta) exists. A wrong shape must fail here.
+        const logger = (args[1] as { logger?: Record<string, unknown> }).logger;
+        expect(Object.keys(logger ?? {})).toEqual(["warn"]);
+        (logger as { warn: (e: string, m?: object) => void }).warn("ai.provider.attempt_failed", { code: "AI_TIMEOUT" });
+        return { service: true };
+      },
       loadAiConfig: () => ({ timeoutMs: 1000, maxRetries: 0, retryBaseDelayMs: 0, retryMaxDelayMs: 0, fallbackModel: undefined }),
       worstCaseAnalysisMs: () => 2000,
       ABANDONED_MARGIN_MS: 500,

@@ -96,6 +96,8 @@ export function createEventsRouter({ prisma, hub, heartbeatMs = 25_000, maxConne
           where: { updatedAt: { gte: since }, ...(authorProfileId ? { authorId: authorProfileId } : {}) },
           orderBy: [{ updatedAt: "asc" }, { id: "asc" }], take: catchUpLimit, select: { id: true, updatedAt: true }
         });
+        // More changes than one replay can carry: tell the client (a comment, invisible to EventSource listeners) so it refetches.
+        if (tickets.length >= catchUpLimit) res.write(": catch-up truncated; refetch ticket lists\n\n");
         for (const ticket of tickets) send(`${ticket.updatedAt.getTime()}-0`, { name: "ticket.updated", ticketId: ticket.id, occurredAt: ticket.updatedAt, version: ticket.updatedAt.toISOString() });
       }
     } catch {

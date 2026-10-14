@@ -216,7 +216,7 @@ export class AiAttemptService {
       written = (await this.prisma.aiAnalysis.updateMany({ where: { id: attemptId, status: "PENDING" }, data: rowToData(row) })).count;
     } catch (error) {
       // A database invariant rejected the row; record a safe failure instead of leaving the attempt PENDING.
-      this.logger.log("error", "ai result rejected by database", { attemptId, errorName: error instanceof Error ? error.name : "unknown" });
+      this.logger.log("error", "ai result rejected by database", { attemptId, errorName: error instanceof Error ? error.name : "unknown", errorCode: error instanceof Prisma.PrismaClientKnownRequestError ? error.code : undefined });
       row = sanitiseRow({ ...row, status: "FAILED", errorCode: "AI_RESULT_INVALID" }, fallbackVersion);
       written = (await this.prisma.aiAnalysis.updateMany({ where: { id: attemptId, status: "PENDING" }, data: rowToData(row) })).count;
     }
@@ -251,9 +251,18 @@ export class AiAttemptService {
     }
 
     const cutoff = new Date(now.getTime() - this.retryMinGapMs);
-    const candidates = await this.prisma.aiAnalysis.findMany({
-      where: { status: "FAILED", errorCode: { in: [...retryableErrorCodes] }, createdAt: { lte: cutoff } }, orderBy: { createdAt: "asc" }, take: 50
-    });
+    // Eligibility is decided in the query, not after the LIMIT: tickets that already used up their retries (or are closed, or
+    // have a newer attempt) must never occupy the batch and starve fresh failures. Re-checked under the lock below.
+    const codes = [...retryableErrorCodes];
+    const candidates = await this.prisma.$queryRaw<Array<{ id: string; ticketId: string }>>`
+      SELECT a."id", a."ticketId" FROM "AiAnalysis" a
+      JOIN "Ticket" t ON t."id" = a."ticketId"
+      WHERE a."status" = 'FAILED' AND a."errorCode" = ANY(${codes}) AND a."createdAt" <= (${cutoff.toISOString()}::timestamptz AT TIME ZONE 'UTC') AND t."status" <> 'CLOSED'
+        AND NOT EXISTS (
+          SELECT 1 FROM "AiAnalysis" n WHERE n."ticketId" = a."ticketId"
+            AND (n."createdAt" > a."createdAt" OR (n."createdAt" = a."createdAt" AND n."id" > a."id")))
+        AND (SELECT count(*) FROM "AiAnalysis" f WHERE f."ticketId" = a."ticketId" AND f."status" = 'FAILED' AND f."errorCode" = ANY(${codes})) <= ${this.maxAutoRetries}
+      ORDER BY a."createdAt" ASC LIMIT 50`;
     let retried = 0;
     for (const failed of candidates) {
       const created = await this.prisma.$transaction(async (tx) => {
