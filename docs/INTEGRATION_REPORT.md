@@ -21,10 +21,10 @@ Security: CSRF, foreign Origin, forged/old/logged-out sessions, role separation,
 
 - **Resolved (privacy hardening)**: royalty/price figures are no longer sent to the AI provider; see "Privacy behaviour" below.
 - `npm audit --omit=dev`: 3 high advisories, all one chain (`prisma` -> `@prisma/config` -> `deepmerge-ts` < 8, GHSA-ggr8-5vv4-36mx). It sits in the Prisma CLI (a devDependency of `@bookleaf/db`, used for migrations), not request handling. The fix is a Prisma major upgrade; not applied.
-- `npm run test:e2e` references Playwright but no config or specs exist; browser E2E was run ad hoc.
+- ~~`npm run test:e2e` had no config or specs~~ Resolved in final QA: Playwright config and 30 specs now exist (`apps/web/e2e`, see docs/TESTING.md).
 - Vite dev server has no `/api` proxy; set `VITE_API_BASE_URL` (CORS is configured for `WEB_ORIGIN`).
 - Engine warnings: some dependencies want Node >= 24.15 / 22.22.2.
-- Not verified: Linux/Docker PostgreSQL (Docker daemon was not running), a real reverse proxy, multi-instance deployment, real OpenRouter.
+- Linux/Docker, PostgreSQL 16 on Linux and a real TLS reverse proxy (Traefik + Let's Encrypt) have since been verified on the staging deployment ([infra/DEPLOY.md](../infra/DEPLOY.md)). Not verified: multi-instance deployment, real OpenRouter.
 
 ## Demo checklist (synthetic data only)
 

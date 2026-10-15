@@ -46,7 +46,8 @@ API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESS
 | `npm run build` | Production build of all workspaces |
 | `npm test` | All workspace suites (AI, API incl. embedded PostgreSQL, web). The API suite starts a throwaway PostgreSQL itself |
 | `npm run test:scaffold` | Contract/Prisma/import alignment checks (run after build) |
-| `BOOKLEAF_AI_ENTRY=packages/ai/dist/index.js npm run test --workspace @bookleaf/api` | Also runs the 11 "real AI package, mocked provider" API tests (skipped otherwise) |
+| `npm run test:e2e` | Browser end-to-end suite (Playwright, 30 tests) against a disposable stack: embedded PostgreSQL, built API and web, mock AI provider. Needs `npm run build` first and a Chromium (`npx playwright install chromium` or `E2E_CHROMIUM_PATH`). See [Testing](docs/TESTING.md) |
+| `BOOKLEAF_AI_ENTRY=<absolute path>/packages/ai/dist/index.js npm run test --workspace @bookleaf/api` | Also runs the 11 "real AI package, mocked provider" API tests (skipped otherwise). The path must be absolute: vitest runs inside `apps/api` |
 | `npm run migrate:status --workspace @bookleaf/db` | Migration state of `DATABASE_URL` |
 
 ## Security notes and limitations
@@ -57,7 +58,7 @@ API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESS
 - AI data minimisation: the provider receives only the ticket subject/description, the last two author-visible messages, public policy excerpts and non-financial book facts (title, status, genre, publication date, print partner, channels). Author name/email/phone/city, ISBN, MRP, royalty amounts and balances, copies sold and payout dates are never sent (allowlist in `apps/api/src/ai/context.ts`, repeated in `packages/ai`). Royalty drafts say the team will verify the figures internally; any amount a draft invents is rejected by the grounding check.
 - A missing `Origin` header is accepted on mutating requests (non-browser clients); the CSRF token is still required.
 - `TicketMessage` rows are append-only by convention (no edit route) but not DB-trigger protected; `AuditLog` and `InternalNote` are.
-- Verified on Windows only. Linux/Docker and real reverse-proxy runs are not yet exercised.
+- Verified on Windows (Node 24.6, Chromium) and on Linux (Node 22 in Docker), and deployed as a staging stack behind Traefik with a Let's Encrypt certificate ([Deployment](infra/DEPLOY.md)). The live OpenRouter API was not exercised (no paid calls); staging runs without AI; see [Known limitations](docs/KNOWN_LIMITATIONS.md) and the [Security review](docs/SECURITY_REVIEW.md) (3 high `npm audit` advisories in the Prisma CLI chain, not reachable at runtime).
 
 ## Confidential source data
 
@@ -66,4 +67,6 @@ The original assignment PDF and JSON stay unchanged under ignored `reference/`; 
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md) · [API contract](docs/API_CONTRACT.md) · [Database schema](docs/DATABASE_SCHEMA.md) · [AI design](docs/AI_DESIGN.md)
-- [Integration report and demo checklist](docs/INTEGRATION_REPORT.md)
+- [Environment guide](docs/ENVIRONMENT.md) · [Testing](docs/TESTING.md) · [Demo instructions](docs/DEMO.md)
+- [Security review](docs/SECURITY_REVIEW.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Submission checklist](docs/SUBMISSION_CHECKLIST.md)
+- [Integration report](docs/INTEGRATION_REPORT.md)
