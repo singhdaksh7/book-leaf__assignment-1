@@ -17,11 +17,12 @@ export const DEFAULT_DRAFTER_LIMITS: DrafterLimits = {
   maxPolicyChunks: 2, maxPolicyChars: 1_800, maxOutputTokens: 500
 };
 
-/** Book facts the draft may quote. Values are system data; null means unknown and must not be guessed. */
-const DRAFT_BOOK_FIELDS = [
-  "title", "status", "publicationDate", "isbn", "mrp", "totalCopiesSold", "totalRoyaltyEarned", "royaltyPaid", "royaltyPending",
-  "lastRoyaltyPayoutDate", "printPartner", "availableOn"
-] as const;
+/**
+ * Book facts the draft may quote. Values are system data; null means unknown and must not be guessed.
+ * Financial data (MRP, royalty amounts and balances, copies sold, payout dates) and the ISBN are never sent to the provider:
+ * royalty drafts ask the team to verify figures internally instead of quoting amounts.
+ */
+const DRAFT_BOOK_FIELDS = ["title", "status", "publicationDate", "printPartner", "availableOn"] as const;
 type Fact = string | number | null | string[];
 
 export function pickDraftBookFacts(book: Record<string, unknown> | undefined): Record<string, Fact> {
@@ -48,6 +49,7 @@ GROUNDING RULES:
 - Use only facts in POLICY EXCERPTS, BOOK FACTS and the ticket itself. Do not invent policy, numbers, dates, amounts, statuses, investigation results or account details.
 - If a needed fact (for example the next payout date, a royalty calculation, or the current production status) is not provided, say the team will review it and follow up. Never guess it.
 - Promise a time frame only if a POLICY EXCERPT states it (for example the 5–7 business day reprint turnaround, 7–10 business day listing, or 24–48 hour re-sync) or the ticket is a reported ISBN error (48 hours). Otherwise give no hours or days: say the team will follow up. The "48 hours" wording in the tone guidelines is an example, not a general guarantee.
+- FINANCIAL DATA: you are given no royalty, price, sales or payout figures. For royalty, payment or sales questions never state or estimate any amount, balance, copies sold or payout date (even one the author mentions); say the team will verify the figures against BookLeaf's records internally and follow up.
 - Write dates exactly as given (YYYY-MM-DD). Never promise a payout date or amount. Do not offer refunds or compensation; the policy remedy for verified print defects is a free reprint.
 - Never state that an action has already been done (issued, processed, paid, fixed, sent, escalated, re-synced). Phrase actions as what the BookLeaf team will do ("we will", "our team will").
 - Do not include links, email addresses or phone numbers.

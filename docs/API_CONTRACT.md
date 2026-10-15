@@ -1,6 +1,6 @@
 # API contract
 
-Base path: `/api/v1`. These are planned endpoints, not implemented routes. Responses are JSON except the SSE stream and the empty logout response. Login is public and must have appropriate login-CSRF/origin protection; all other mutating requests require cookie authentication plus CSRF protection. Parse requests and serialize responses through the named schemas in `@bookleaf/contracts`.
+Base path: `/api/v1`. All endpoints below are implemented in `apps/api` and verified against the real server (see `docs/INTEGRATION_REPORT.md`). Responses are JSON except the SSE stream and the empty logout response. Login is public and must have appropriate login-CSRF/origin protection; all other mutating requests require cookie authentication plus CSRF protection. Parse requests and serialize responses through the named schemas in `@bookleaf/contracts`.
 
 ## Error envelope
 
@@ -21,6 +21,13 @@ Use `400 VALIDATION_ERROR`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOU
 | GET | `/author/tickets` | Author | 200 `ticketListResponseSchema`; caller's tickets, paginated/filtered. |
 | POST | `/author/tickets` | Author | `createTicketSchema` -> 201 `ticketResponseSchema`; null `bookId` means General / Account Level. |
 | GET | `/author/tickets/:ticketId` | Author owner | 200 `ticketDetailResponseSchema`; shared messages only. |
+| GET | `/author/books/:bookId` | Author owner | 200 `bookSchema` (bare object, not wrapped); 404 for another author's book. |
+| POST | `/author/tickets/:ticketId/messages` | Author owner | `ticketReplySchema` -> 201 `ticketMessageResponseSchema`; visibility is always `AUTHOR` (a client-supplied visibility is ignored); 409 when the ticket is CLOSED; rate limited. |
+| POST | `/author/tickets/:ticketId/attachments?filename=` | Author owner | Raw body with an allowed `Content-Type` (see `ATTACHMENT_*`) -> 201 `attachmentResponseSchema`. Type, size and magic bytes are validated; at most `ATTACHMENT_MAX_PER_TICKET` per ticket; 409 when CLOSED. |
+| GET | `/author/tickets/:ticketId/attachments` | Author owner | 200 `attachmentListResponseSchema` (`{ items }`). No storage key is ever returned. |
+| GET | `/author/tickets/:ticketId/attachments/:attachmentId` | Author owner | Bytes with `Content-Disposition: attachment`; 404 for others. |
+| GET | `/admin/tickets/:ticketId/attachments` | Admin | 200 `attachmentListResponseSchema`. |
+| GET | `/admin/tickets/:ticketId/attachments/:attachmentId` | Admin | Bytes (download). |
 | GET | `/admin/tickets` | Admin | 200 `adminQueueResponseSchema`; same pagination/filter format; oldest urgent unresolved first. |
 | GET | `/admin/tickets/:ticketId` | Admin | 200 `adminTicketDetailResponseSchema`. |
 | PATCH | `/admin/tickets/:ticketId` | Admin | `updateTicketSchema` -> 200 `ticketResponseSchema`; AI values remain overrideable. |
@@ -31,7 +38,17 @@ Use `400 VALIDATION_ERROR`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOU
 | GET | `/admin/tickets/:ticketId/ai-analysis` | Admin | 200 `aiAnalysisResponseSchema`; latest attempt or null if none. |
 | GET | `/events/tickets` | Authenticated | `text/event-stream`; events are filtered to author ownership or admin role. |
 
-SSE event names: `ticket.created`, `ticket.updated`, `ticket.reply.created`, `ticket.analysis.updated`. Payload always includes `ticketId`, ISO `occurredAt`, and a safe minimal resource version. Clients reconnect with `Last-Event-ID`; if unavailable, poll ticket list/detail resources every 20-30 seconds.
+SSE event names: `ticket.created`, `ticket.updated`, `ticket.reply.created`, `ticket.analysis.updated`. Payload (`ticketEventPayloadSchema`) is exactly `{ ticketId, occurredAt, version }`, all ISO strings; `version` is the ticket `updatedAt`. SSE `id:` is `<epoch-ms>-<n>`. Delivery is at-least-once: on reconnect with `Last-Event-ID` the server emits a `ticket.updated` for every in-scope ticket changed since that time, so clients dedupe on (`ticketId`, `version`). Clients reconnect with `Last-Event-ID`; if unavailable, poll ticket list/detail resources every 20-30 seconds.
+
+## Implementation notes (verified)
+
+- List responses use `{ items, page, pageSize, total }` (books, tickets, admin queue). Attachment lists use `{ items }`.
+- Creating a ticket requires an explicit `bookId` (`null` = General / Account Level); omitting it is a 400.
+- Admin ticket filters accept only `status`, `category`, `priority`, `from`, `to`, pagination; unknown keys (for example `authorId`, `q`) are rejected with 400.
+- Priority values: `CRITICAL | HIGH | MEDIUM | LOW`. Status: `OPEN | IN_PROGRESS | RESOLVED | CLOSED`. A CLOSED ticket cannot be reopened (409) or replied to (409).
+- `POST /admin/tickets/:id/ai-analysis` has a 30 s refresh cooldown after the latest attempt; within it the existing attempt is returned.
+- Mutating requests need the session cookie, `X-CSRF-Token` (value of the `XSRF-TOKEN` cookie) and a matching `Origin`. A request with no `Origin` header is accepted unless `Sec-Fetch-Site: cross-site` (non-browser clients); the CSRF token is still required.
+- There is no separate "AI review" endpoint: the draft is returned in `aiAnalysis.analysis.draftResponse`; an admin edits it and sends it through `/admin/tickets/:id/replies`. Nothing is ever sent automatically.
 
 ## Stable resource rules
 

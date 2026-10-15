@@ -19,7 +19,7 @@ const SCENARIOS: Scenario[] = [
     name: "royalty inquiry", subject: "No royalty yet", description: "I published my book 4 months ago and still haven't received any royalty. What's going on?",
     book: { title: "Sample Book", status: "Published", royaltyPending: 2500, lastRoyaltyPayoutDate: null },
     category: "ROYALTY_PAYMENTS", priority: "HIGH", chunk: "kb.royalty-policy",
-    body: "I'm sorry you have waited 4 months without a clear answer, and I understand the frustration. Royalties are calculated quarterly and paid within 45 days of the quarter ending, by bank transfer to the account linked in your dashboard. Our records show ₹2,500 pending for this book. Our team will confirm your next payout date and follow up with you. Please check that your bank details are linked in your dashboard."
+    body: "I'm sorry you have waited 4 months without a clear answer, and I understand the frustration. Royalties are calculated quarterly and paid within 45 days of the quarter ending, by bank transfer to the account linked in your dashboard. Our team will verify the royalty figures for your book against our internal records and follow up with you. Please check that your bank details are linked in your dashboard."
   },
   {
     name: "ISBN escalation", subject: "Different ISBN on Amazon", description: "My book is showing a different ISBN on Amazon than what's on the physical copy.",
@@ -72,6 +72,14 @@ describe.each(SCENARIOS)("analyzeTicket: $name", (s) => {
     expect(outcome.analysis.knowledgeBaseCitations).toContain(s.chunk);
     // The author's identity stays out of both prompts.
     for (const call of provider.calls) for (const pii of ["Jane", "Roe", "999", "Pune"]) expect(call.user + call.system).not.toContain(pii);
+  });
+
+  it("never sends exact financial data to the provider, even when the caller supplies it", async () => {
+    const { provider } = await run();
+    for (const call of provider.calls) {
+      const sent = call.user + call.system;
+      for (const leaked of ["2500", "2,500", "royaltyPending", "royaltyPaid", "totalRoyaltyEarned", "totalCopiesSold", "mrp", "lastRoyaltyPayoutDate"]) expect(sent).not.toContain(leaked);
+    }
   });
 
   it("tracks tokens and cost across both calls", async () => {
@@ -190,8 +198,12 @@ describe("unsupported claims are rejected", () => {
     expect(outcome.meta.draftSource).toBe("fallback");
     expect(outcome.analysis.knowledgeBaseCitations).not.toContain("kb.isbn-policy");
   });
-  it("allows a grounded draft to state the book's real figures and future commitments", async () => {
-    const body = "Our records show ₹2,500 pending. Our team will review this and follow up with you.";
+  it("rejects a draft that states a royalty amount (none was provided) and accepts one that defers to internal verification", async () => {
+    const invented = scriptedProvider(modelAnswer({ category: "ROYALTY_PAYMENTS", citations: [] }), draftAnswer("Our records show ₹2,500 pending. Our team will review this and follow up with you.", []));
+    const bad = await createAiService({ provider: invented }).analyzeTicketDetailed(input(royalty.subject, royalty.description, { bookContext: royalty.book }));
+    expect(bad.meta.draftSource).toBe("fallback");
+    expect(bad.analysis.draftResponse).not.toContain("2,500");
+    const body = "Our team will verify the royalty figures against our internal records and follow up with you.";
     const provider = scriptedProvider(modelAnswer({ category: "ROYALTY_PAYMENTS", citations: [] }), draftAnswer(body, []));
     const outcome = await createAiService({ provider }).analyzeTicketDetailed(input(royalty.subject, royalty.description, { bookContext: royalty.book }));
     expect(outcome.meta.draftSource).toBe("model");

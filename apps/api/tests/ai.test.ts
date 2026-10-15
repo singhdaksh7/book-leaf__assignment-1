@@ -70,7 +70,10 @@ describe("analysis on ticket creation", () => {
     await s.ai.idle();
     const [input] = s.engine.calls;
     expect(input).toMatchObject({ ticketId: created.body.ticket.id, subject: valid.subject, description: valid.description, authorContext: { name: authorA!.name } });
-    expect(input?.bookContext).toMatchObject({ externalBookId: book.externalBookId, title: book.title });
+    expect(input?.bookContext).toMatchObject({ title: book.title, status: book.status });
+    // Data minimisation: no financial data, identifiers or contact details are handed to the engine at all.
+    expect(Object.keys(input?.bookContext ?? {}).sort()).toEqual(["availableOn", "genre", "printPartner", "publicationDate", "status", "title"]);
+    for (const key of ["mrp", "authorRoyaltyPerCopy", "totalCopiesSold", "totalRoyaltyEarned", "royaltyPaid", "royaltyPending", "lastRoyaltyPayoutDate", "isbn", "externalBookId", "authorId", "id"]) expect(input?.bookContext).not.toHaveProperty(key);
     expect(JSON.stringify(input)).not.toContain(authorA!.email);
     expect(JSON.stringify(input)).not.toContain(authorA!.phone);
   });

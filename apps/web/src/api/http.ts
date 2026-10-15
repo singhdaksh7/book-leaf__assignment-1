@@ -35,6 +35,9 @@ import {
   type AssignmentResponse,
   type AiAnalysisResponse,
   type AiAnalysisRequestResponse,
+  attachmentSchema,
+  attachmentResponseSchema,
+  attachmentListResponseSchema,
 } from "@bookleaf/contracts";
 import { z } from "zod";
 import {
@@ -46,23 +49,7 @@ import {
 } from "./client";
 import { getAttachmentContentType, extractSafeFileName } from "./attachments";
 
-export const attachmentSchema = z.object({
-  id: z.string().min(1),
-  ticketId: z.string().min(1),
-  fileName: z.string(),
-  contentType: z.string(),
-  sizeBytes: z.number().int().min(1),
-  createdAt: z.string(),
-});
-
-export const attachmentResponseSchema = z.object({
-  attachment: attachmentSchema,
-});
-
-export const attachmentListResponseSchema = z.object({
-  items: z.array(attachmentSchema),
-});
-
+export { attachmentSchema, attachmentResponseSchema, attachmentListResponseSchema };
 
 type SessionExpiredHandler = () => void;
 const sessionExpiredHandlers = new Set<SessionExpiredHandler>();

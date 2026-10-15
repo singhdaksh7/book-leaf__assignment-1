@@ -93,6 +93,17 @@ export const auditEventSchema = z.object({
   requestId: z.string().nullable(), createdAt: timestampSchema
 });
 
+// Attachment metadata. The raw storage key is never part of any response.
+export const attachmentSchema = z.object({
+  id: idSchema, ticketId: idSchema, fileName: z.string(), contentType: z.string(), sizeBytes: z.number().int().min(1), createdAt: timestampSchema
+});
+export const attachmentResponseSchema = z.object({ attachment: attachmentSchema });
+export const attachmentListResponseSchema = z.object({ items: z.array(attachmentSchema) });
+
+// Server-Sent Events: GET /events/tickets. `id:` is `<epoch-ms>-<n>`; `version` is the ticket's ISO updatedAt (idempotency key with ticketId).
+export const ticketEventNameSchema = z.enum(["ticket.created", "ticket.updated", "ticket.reply.created", "ticket.analysis.updated"]);
+export const ticketEventPayloadSchema = z.object({ ticketId: idSchema, occurredAt: timestampSchema, version: timestampSchema });
+
 const analysisAttemptFields = { id: idSchema, ticketId: idSchema, createdAt: timestampSchema };
 // AiService returns a completed result; HTTP resources also represent pending/failed attempts.
 export const aiAnalysisAttemptSchema = z.discriminatedUnion("status", [
@@ -142,3 +153,8 @@ export type AiAnalysisAttempt = z.infer<typeof aiAnalysisAttemptSchema>;
 export type AiAnalysisResponse = z.infer<typeof aiAnalysisResponseSchema>;
 export type AiAnalysisRequestResponse = z.infer<typeof aiAnalysisRequestResponseSchema>;
 export type AdminTicketDetailResponse = z.infer<typeof adminTicketDetailResponseSchema>;
+export type Attachment = z.infer<typeof attachmentSchema>;
+export type AttachmentResponse = z.infer<typeof attachmentResponseSchema>;
+export type AttachmentListResponse = z.infer<typeof attachmentListResponseSchema>;
+export type TicketEventName = z.infer<typeof ticketEventNameSchema>;
+export type TicketEventPayload = z.infer<typeof ticketEventPayloadSchema>;

@@ -17,8 +17,11 @@ export const DEFAULT_CLASSIFIER_LIMITS: ClassifierLimits = {
   maxChunks: 3, maxKbChars: 2_400, maxOutputTokens: 250
 };
 
-/** Whitelist of book facts relevant to triage. Identity, contact and financial totals are deliberately excluded. */
-const BOOK_FIELDS = ["status", "genre", "publicationDate", "lastRoyaltyPayoutDate", "royaltyPending", "availableOn", "printPartner"] as const;
+/**
+ * Whitelist of book facts relevant to triage. Identity, contact and ALL financial data (prices, royalty amounts and balances,
+ * copies sold, payout dates) are deliberately excluded: they never reach the external provider.
+ */
+const BOOK_FIELDS = ["status", "genre", "publicationDate", "availableOn", "printPartner"] as const;
 
 export function pickBookFacts(book: Record<string, unknown> | undefined): Record<string, string | number | null | string[]> {
   const out: Record<string, string | number | null | string[]> = {};

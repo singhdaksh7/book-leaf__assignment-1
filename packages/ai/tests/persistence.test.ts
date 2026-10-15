@@ -202,7 +202,8 @@ describe("analyzeForPersistence", () => {
     const a = inputFingerprint(ticket);
     expect(inputFingerprint({ ...ticket, description: `  ${ticket.description}\n` })).toBe(a);
     expect(inputFingerprint({ ...ticket, description: ticket.description + " Also my ISBN." })).not.toBe(a);
-    expect(inputFingerprint({ ...ticket, bookContext: { royaltyPending: 5 } })).not.toBe(a);
+    expect(inputFingerprint({ ...ticket, bookContext: { status: "Out of Print" } })).not.toBe(a);
+    expect(inputFingerprint({ ...ticket, bookContext: { royaltyPending: 5 } })).toBe(inputFingerprint({ ...ticket, bookContext: { royaltyPending: 9 } })); // financial data is not part of the analysis input
     expect(inputFingerprint({ ...ticket, authorContext: { name: "Someone Else" } } as never)).toBe(a);
     expect(a).toMatch(/^[0-9a-f]{64}$/);
     expect(a).not.toContain("royalty");

@@ -205,7 +205,8 @@ describe("fingerprint stability and deduplication assumptions", () => {
   });
   it("changes when content, relevant facts or the history window change", () => {
     expect(inputFingerprint({ ...ticket, description: `${ticket.description} Update.`, bookContext: book })).not.toBe(a);
-    expect(inputFingerprint({ ...ticket, bookContext: { ...book, royaltyPending: 0 } })).not.toBe(a);
+    expect(inputFingerprint({ ...ticket, bookContext: { ...book, status: "Out of Print" } })).not.toBe(a);
+    expect(inputFingerprint({ ...ticket, bookContext: { ...book, royaltyPending: 0 } })).toBe(a); // financial figures never reach the provider, so they do not trigger re-analysis
     const h = (n: number) => Array.from({ length: n }, (_, i) => ({ author: "AUTHOR" as const, body: `m${i}` }));
     expect(inputFingerprint({ ...ticket, bookContext: book, history: h(3) })).toBe(inputFingerprint({ ...ticket, bookContext: book, history: h(3).slice(1) })); // only the last 2 matter
     expect(inputFingerprint({ ...ticket, bookContext: book, history: [{ author: "AUTHOR", body: "new" }] })).not.toBe(a);

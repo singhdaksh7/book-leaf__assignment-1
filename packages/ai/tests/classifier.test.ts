@@ -170,8 +170,8 @@ describe("cost-conscious context and privacy", () => {
       bookContext: { title: "Secret Title", isbn: "978-0000000000", status: "Published", royaltyPending: 2500, totalRoyaltyEarned: 77777 }
     } as never);
     const { user } = p.calls[0]!;
-    expect(user).toContain('"royaltyPending":2500');
-    for (const leaked of ["Jane", "999", "Pune", "jane@", "Secret Title", "978-", "77777"]) expect(user).not.toContain(leaked);
+    expect(user).toContain('"status":"Published"');
+    for (const leaked of ["Jane", "999", "Pune", "jane@", "Secret Title", "978-", "77777", "2500", "royaltyPending", "totalRoyaltyEarned"]) expect(user).not.toContain(leaked);
   });
   it("uses a static system prompt so provider prompt caching applies", async () => {
     const p = scriptedProvider(modelAnswer());

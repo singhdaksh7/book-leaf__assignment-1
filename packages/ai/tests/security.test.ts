@@ -124,7 +124,7 @@ describe("strict draft validation: rejected", () => {
 describe("strict draft validation: allowed when grounded", () => {
   const cases: Array<[string, Parameters<typeof createResponseDrafter>[0] extends never ? never : string, string, Record<string, unknown>?]> = [
     ["ROYALTY_PAYMENTS", "Royalties are paid within 45 days of the quarter ending.", "royalty 4 months"],
-    ["ROYALTY_PAYMENTS", "Our records show ₹2,500 pending and a last payout recorded on 2025-12-15.", "royalty 4 months", royaltyInput.bookContext],
+    ["ROYALTY_PAYMENTS", "Our team will verify your royalty figures against our internal records and follow up.", "royalty 4 months", royaltyInput.bookContext],
     ["DISTRIBUTION_AVAILABILITY", "Our team can trigger a re-sync within 24–48 hours.", "unavailable on Amazon"],
     ["PRINTING_QUALITY", "A free reprint after verification takes 5–7 business days.", "print quality blurry"],
     ["DISTRIBUTION_AVAILABILITY", "New listings typically go live within 7–10 business days after publication.", "listing amazon"],

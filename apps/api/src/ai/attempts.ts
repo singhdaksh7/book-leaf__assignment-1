@@ -4,6 +4,7 @@ import type { Logger } from "../http/logger.js";
 import { silentLogger } from "../http/logger.js";
 import type { TicketEventHub } from "../events/hub.js";
 import { serializeBook } from "../serializers.js";
+import { minimizeBookContext } from "./context.js";
 import { retryableErrorCodes, type AiAnalysisInput, type AiEngine, type AiRowData } from "./engine.js";
 
 type Tx = Prisma.TransactionClient;
@@ -187,7 +188,7 @@ export class AiAttemptService {
     return {
       ticketId: ticket.id, subject: ticket.subject, description: ticket.description,
       authorContext: { name: ticket.author.name },
-      ...(ticket.book ? { bookContext: serializeBook(ticket.book) as unknown as Record<string, unknown> } : {}),
+      ...(ticket.book ? { bookContext: minimizeBookContext(serializeBook(ticket.book) as unknown as Record<string, unknown>) } : {}),
       history: messages.reverse().map((m) => ({ author: m.author.role === "ADMIN" ? ("ADMIN" as const) : ("AUTHOR" as const), body: m.body }))
     };
   }

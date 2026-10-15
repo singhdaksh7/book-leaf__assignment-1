@@ -29,7 +29,7 @@ const prisma = new PrismaClient();
 const [authorA] = loadSyntheticDataset();
 const KEY = "sk-or-test-0000000000000000";
 const WRAP = (body: string) => `Dear {{authorFirstName}},\n\n${body}\n\nWarm regards,\nBookLeaf Author Support`;
-const ROYALTY_BODY = "I'm sorry you have waited 4 months without a clear answer, and I understand the frustration. Royalties are calculated quarterly and paid within 45 days of the quarter ending, by bank transfer to the account linked in your dashboard. Our records show ₹2,500 pending for this book. Our team will confirm your next payout date and follow up with you. Please check that your bank details are linked in your dashboard.";
+const ROYALTY_BODY = "I'm sorry you have waited 4 months without a clear answer, and I understand the frustration. Royalties are calculated quarterly and paid within 45 days of the quarter ending, by bank transfer to the account linked in your dashboard. Our team will verify the royalty figures for your book against our internal records and follow up with you. Please check that your bank details are linked in your dashboard.";
 const classification = (over: Record<string, unknown> = {}) => JSON.stringify({ category: "ROYALTY_PAYMENTS", priority: "HIGH", confidence: 0.9, rationale: "The author has not been paid royalties.", citations: ["kb.royalty-policy"], ...over });
 const draft = (body = ROYALTY_BODY) => JSON.stringify({ draft: WRAP(body), citations: ["kb.royalty-policy"] });
 const envelope = (content: string, usage: Record<string, unknown> | null = { prompt_tokens: 400, completion_tokens: 50, total_tokens: 450, cost: 0.00009 }) =>
@@ -89,7 +89,7 @@ describe.skipIf(!available)(`real @bookleaf/ai (${sourceRef}) through the backen
     const { app, config } = createTestApp(prisma, { TICKET_CREATE_LIMIT_PER_HOUR: "100" }, { ai, events, logger: log.logger });
     const pa = await profileFor(prisma, authorA!.author_id);
     const book = await prisma.book.findFirstOrThrow({ where: { authorId: pa.id }, orderBy: { externalBookId: "asc" } });
-    await prisma.book.update({ where: { id: book.id }, data: { status: "Published", royaltyPending: 2500, lastRoyaltyPayoutDate: null } });
+    await prisma.book.update({ where: { id: book.id }, data: { status: "Published", royaltyPending: 2500, royaltyPaid: 7777, totalRoyaltyEarned: 10277, totalCopiesSold: 31337, mrp: 4999, lastRoyaltyPayoutDate: null } });
     const author = await login(app, config, authorA!.email);
     const admin = await login(app, config, ADMIN_EMAIL);
     const create = async () => {
@@ -146,6 +146,23 @@ describe.skipIf(!available)(`real @bookleaf/ai (${sourceRef}) through the backen
     expect(row!.draftResponse).toBeTruthy();
     expect(row!.draftResponse).not.toContain("{{");
     expect(s.log.lines.find((l) => l.message === "ai attempt finished")).toMatchObject({ status: "COMPLETED", quality: "PARTIAL_FALLBACK" });
+  });
+
+  it("PRIVACY: no financial data, ISBN or author contact details reach the provider; the draft defers figures to internal verification", async () => {
+    const s = await boot(aiEnv());
+    mock.reset({ status: 200, body: envelope(classification()) }, { status: 200, body: envelope(draft()) });
+    const before = mock.requests.length;
+    const ticketId = await s.create();
+    const calls = mock.requests.slice(before);
+    const sent = calls.map((r) => r.body).join("|");
+    expect(calls.length).toBe(2);
+    for (const leaked of ["2500", "2,500", "7777", "10277", "31337", "4999", "royaltyPending", "royaltyPaid", "totalRoyaltyEarned", "totalCopiesSold", "mrp", "lastRoyaltyPayoutDate", "authorRoyaltyPerCopy"]) expect(sent).not.toContain(leaked);
+    const profile = await prisma.authorProfile.findUniqueOrThrow({ where: { id: s.pa.id }, include: { user: true } });
+    for (const pii of [profile.user.email, profile.phone ?? " ", profile.city ?? " ", profile.name]) expect(sent).not.toContain(pii);
+    const [row] = await attempts(ticketId);
+    expect(row).toMatchObject({ status: "COMPLETED" });
+    expect(row!.draftResponse).not.toMatch(/2,?500|7,?777/);
+    expect(row!.draftResponse).toMatch(/verify|internal/i);
   });
 
   it("FULL fallback when the provider is down: FAILED with a transient code, no draft, ticket intact, then bounded retries", async () => {

@@ -187,7 +187,7 @@ These are product decisions encoded in code; BookLeaf operations should confirm 
 
 - No live OpenRouter call has been made; model behaviour under the strict checks is unobserved.
 - Retrieval is keyword-based; swap `KnowledgeRetriever` for embeddings if the knowledge base grows.
-- Policy text is only the assignment's knowledge base; the model cannot know a payout date, royalty calculation or production state beyond the supplied book facts. It then says the team will review and follow up.
+- Policy text is only the assignment's knowledge base; the model cannot know a payout date, royalty calculation or production state beyond the supplied book facts. It then says the team will review and follow up. Financial book data (MRP, royalty amounts, balances, copies sold, payout dates) is never supplied, so royalty drafts always defer figures to internal verification.
 - Dates in drafts must be exact `YYYY-MM-DD` values from the supplied facts; other renderings fall back to the template.
 - The fingerprint cannot be persisted without a schema column. Interim: single-flight plus a queue key `ticketId + inputFingerprint`.
 - Rate limiting across concurrent analyses is the backend's responsibility.

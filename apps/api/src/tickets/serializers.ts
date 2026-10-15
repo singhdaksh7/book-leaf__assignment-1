@@ -2,7 +2,8 @@ import {
   aiAnalysisAttemptSchema, auditEventSchema, authorTicketMessageSchema, internalNoteResourceSchema, ticketAssignmentSchema,
   ticketMessageSchema, ticketSchema, ticketSummarySchema, aiAnalysisSchema
 } from "@bookleaf/contracts";
-import type { AiAnalysisAttempt, AuditEvent, AuthorTicketMessage, InternalNote, Ticket, TicketAssignment, TicketMessage, TicketSummary } from "@bookleaf/contracts";
+import { attachmentSchema, attachmentResponseSchema, attachmentListResponseSchema } from "@bookleaf/contracts";
+import type { Attachment, AiAnalysisAttempt, AuditEvent, AuthorTicketMessage, InternalNote, Ticket, TicketAssignment, TicketMessage, TicketSummary } from "@bookleaf/contracts";
 import type { AiAnalysis, AuditLog, InternalNote as InternalNoteRow, Ticket as TicketRow, TicketAssignment as AssignmentRow, TicketAttachment, TicketMessage as MessageRow } from "@bookleaf/db";
 import { z } from "zod";
 import { toTimestamp } from "../http/serialize.js";
@@ -52,13 +53,8 @@ export function serializeAiAttempt(row: AiAnalysis): AiAnalysisAttempt {
   return aiAnalysisAttemptSchema.parse({ ...base, status: "COMPLETED", analysis: analysis.data, errorCode: null });
 }
 
-// Attachment metadata is not in @bookleaf/contracts (reported to the controller); this local schema is the proposal.
-export const attachmentSchema = z.object({
-  id: z.string().min(1), ticketId: z.string().min(1), fileName: z.string(), contentType: z.string(), sizeBytes: z.number().int().min(1), createdAt: z.string().datetime()
-});
-export type AttachmentMeta = z.infer<typeof attachmentSchema>;
-export const attachmentResponseSchema = z.object({ attachment: attachmentSchema });
-export const attachmentListResponseSchema = z.object({ items: z.array(attachmentSchema) });
+export { attachmentSchema, attachmentResponseSchema, attachmentListResponseSchema };
+export type AttachmentMeta = Attachment;
 
 export const serializeAttachment = (a: TicketAttachment): AttachmentMeta => attachmentSchema.parse({
   id: a.id, ticketId: a.ticketId, fileName: a.fileName, contentType: a.contentType, sizeBytes: a.sizeBytes, createdAt: toTimestamp(a.createdAt)

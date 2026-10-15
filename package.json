@@ -13,7 +13,7 @@
     "dev": "npm run dev --workspace @bookleaf/api",
     "dev:web": "npm run dev --workspace @bookleaf/web",
     "lint": "npm run lint --workspaces --if-present",
-    "typecheck": "npm run build --workspace @bookleaf/contracts && npm run build --workspace @bookleaf/db && npm run typecheck --workspace @bookleaf/db && npm run typecheck --workspace @bookleaf/ai && npm run typecheck --workspace @bookleaf/api && npm run typecheck --workspace @bookleaf/web",
+    "typecheck": "npm run build --workspace @bookleaf/contracts && npm run build --workspace @bookleaf/db && npm run typecheck --workspace @bookleaf/db && npm run build --workspace @bookleaf/ai && npm run typecheck --workspace @bookleaf/ai && npm run typecheck --workspace @bookleaf/api && npm run typecheck --workspace @bookleaf/web",
     "test:scaffold": "node --test tests/scaffold.test.mjs",
     "test": "npm run test --workspaces --if-present",
     "test:api": "npm run test --workspace @bookleaf/api",

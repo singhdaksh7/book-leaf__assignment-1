@@ -1,76 +1,69 @@
 # BookLeaf Author Support Portal
 
-Phase 1 scaffold for an author support portal with an internal admin queue and AI-assisted ticket analysis. **This is not a working application.** Authentication, API routes, database migrations, seeding, UI screens, live updates, and the AI provider adapter are pending implementation by their assigned owners.
+A full-stack author support portal: authors browse their books and raise support tickets (with attachments and replies); admins triage a queue, assign tickets, add private notes, review AI-generated drafts and send replies. AI never sends anything: every draft is reviewed and sent by an admin.
 
-## Architecture and workspaces
+## Architecture
 
-An npm workspace monorepo uses TypeScript, React/Vite, Express, PostgreSQL/Prisma, and Zod. The planned API owns authentication, authorization, persistence, and ticket events. The AI service produces drafts for mandatory admin review; it cannot send replies.
+npm-workspace monorepo: TypeScript, React/Vite, Express, PostgreSQL/Prisma, Zod. See [Architecture](docs/ARCHITECTURE.md).
 
-| Workspace | Responsibility | Current status |
-| --- | --- | --- |
-| `apps/web` / `@bookleaf/web` | Author/admin browser UI | Empty entry point and Vite shell |
-| `apps/api` / `@bookleaf/api` | REST API and SSE | Placeholder entry point; no listening server |
-| `packages/contracts` / `@bookleaf/contracts` | Shared request/response schemas and inferred types | Scaffold contracts defined |
-| `packages/db` / `@bookleaf/db` | Prisma schema and server-only exports | Schema and importable package; no migrations or seed |
-| `packages/ai` / `@bookleaf/ai` | Provider-neutral `AiService` | Interface only; no OpenRouter adapter |
-| `tests`, `infra` | Integration checks and future infrastructure | Scaffold tests only; infrastructure pending |
+| Workspace | Responsibility |
+| --- | --- |
+| `apps/web` (`@bookleaf/web`) | Author and admin browser UI (React, Vite). Talks to the API through a typed client; mock mode is for offline development only. |
+| `apps/api` (`@bookleaf/api`) | Express REST API, cookie sessions + CSRF, attachments on local disk, Server-Sent Events, AI attempt orchestration. |
+| `packages/contracts` | Zod schemas and inferred types shared by API and web (authoritative wire format). |
+| `packages/db` | Prisma schema, 5 SQL migrations (constraints and triggers), importer/seed. |
+| `packages/ai` | Provider-neutral AI service (OpenRouter adapter): grounded classification and drafting, prompt-injection hardening, bounded retries. |
 
 ## Local setup
 
-Use Node.js 22 LTS or newer and npm 10 (the package manager declaration specifies npm 10.9.2). Install and compile from the repository root:
+Requirements: Node.js `^22.22.2 || ^24.15.0 || >=26` (dependencies declare this; older Node only warns), npm 10, PostgreSQL 16+ with a **UTF8** database.
 
 ```powershell
 npm install
-npm run typecheck
+copy apps\api\.env.example apps\api\.env      # then edit DATABASE_URL, SESSION_SECRET, WEB_ORIGIN
+copy packages\db\.env.example packages\db\.env
 npm run build
-npm run test:scaffold
-npm ls --workspaces --depth=0
+npm run migrate:deploy --workspace @bookleaf/db
+# Synthetic demo data only (10 fake authors, 18 books). Passwords come from the environment, never from the dataset:
+$env:BOOKLEAF_SEED_AUTHOR_PASSWORD="choose-a-demo-password"
+$env:BOOKLEAF_SEED_ADMIN_EMAIL="admin@example.test"; $env:BOOKLEAF_SEED_ADMIN_PASSWORD="choose-another-password"
+npm run seed:synthetic --workspace @bookleaf/db
+npm run dev                                    # API on :3000
+$env:VITE_USE_MOCKS="false"; $env:VITE_API_BASE_URL="http://localhost:3000/api/v1"; npm run dev:web   # web on :5173
 ```
 
-Build generates Prisma Client locally without connecting to PostgreSQL and emits server/package JavaScript and declarations into each workspace's ignored `dist/`. The browser typecheck never emits files. Package imports resolve after build; rerun the relevant package build after editing its source. Compilation and scaffold checks do not establish working application behavior.
+`WEB_ORIGIN` must exactly equal the browser origin (default `http://localhost:5173`). Author logins are the synthetic `synthetic.authorN@example.test` addresses. Rebuild `@bookleaf/db` / `@bookleaf/ai` after editing them; on Windows stop the running API first (it locks the Prisma engine DLL and `prisma generate` fails with EPERM).
 
-For later backend work, copy `apps/api/.env.example` and `packages/db/.env.example` to the adjacent `.env` files and configure a local PostgreSQL URL. Copy `apps/web/.env.example` to `apps/web/.env` if overriding the Vite API URL. All real `.env` files are ignored. Environment loading in the API remains a backend task.
+### Environment variables
 
-## Development commands
+API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESSION_SECRET` (>= 32 chars, placeholders rejected in production), `WEB_ORIGIN` (https required in production), `PORT`, `TRUST_PROXY` (hop count behind a reverse proxy), `SESSION_TTL_HOURS`, login/ticket/reply rate limits, `ATTACHMENT_DIR`, `ATTACHMENT_MAX_BYTES`, `ATTACHMENT_MAX_PER_TICKET`, and the AI settings `OPENROUTER_API_KEY` (empty = AI disabled, tickets still work), `OPENROUTER_MODEL`, `OPENROUTER_BASE_URL`, `AI_TIMEOUT_MS`, `AI_MAX_RETRIES`. Web: `VITE_API_BASE_URL`, `VITE_USE_MOCKS` (`false` for the real API; production builds always use the real API).
 
-| Command | Meaning / limitation |
+## Commands
+
+| Command | Meaning |
 | --- | --- |
-| `npm run dev` | Watches the API placeholder; does not serve endpoints yet |
-| `npm run dev:web` | Serves the Vite shell; no portal screens yet |
-| `npm run typecheck` | Builds shared declarations and checks all TypeScript workspaces |
-| `npm run build` | Compiles packages/API and bundles the web shell |
-| `npm run test:scaffold` | Checks wire contracts, Prisma alignment and imports after build |
-| `npm run generate --workspace @bookleaf/db` | Generates Prisma Client locally |
-| `npm run validate --workspace @bookleaf/db` | Validates Prisma schema; requires `DATABASE_URL`, no DB connection |
-| `npm run migrate:dev --workspace @bookleaf/db` | Future local development migration command; requires PostgreSQL |
-| `npm test`, `npm run test:api`, `npm run test:e2e` | Reserved implementation commands; no API/UI/E2E suites exist yet |
-| `npm run lint` | Script aggregation only; no lint checks are configured yet |
+| `npm run typecheck` | Builds shared packages, then typechecks every workspace |
+| `npm run build` | Production build of all workspaces |
+| `npm test` | All workspace suites (AI, API incl. embedded PostgreSQL, web). The API suite starts a throwaway PostgreSQL itself |
+| `npm run test:scaffold` | Contract/Prisma/import alignment checks (run after build) |
+| `BOOKLEAF_AI_ENTRY=packages/ai/dist/index.js npm run test --workspace @bookleaf/api` | Also runs the 11 "real AI package, mocked provider" API tests (skipped otherwise) |
+| `npm run migrate:status --workspace @bookleaf/db` | Migration state of `DATABASE_URL` |
 
-There is deliberately no `seed` command until the backend owner supplies and verifies the importer. See [seed handoff](data/README.md).
+## Security notes and limitations
 
-## Package use
-
-```ts
-import { ticketDetailResponseSchema } from "@bookleaf/contracts";
-import type { TicketDetailResponse } from "@bookleaf/contracts";
-// Server only:
-import { PrismaClient } from "@bookleaf/db";
-import type { AiAnalysis } from "@bookleaf/db";
-```
-
-`@bookleaf/db` exports the generated Prisma constructor, namespace, enums, and model types. It creates no global client and makes no connection on import. The backend owner must explicitly instantiate a client and manage its connection/shutdown lifecycle. Do not import the DB package into the browser or AI engine.
+- Sessions: server-side, httpOnly cookie, `SameSite=Lax`, `Secure` in production, CSRF double-submit token + Origin check. The API does not serve the web app: deploy web and API **on the same site** (for example one reverse proxy: `/` -> static web, `/api` -> API) with `TRUST_PROXY` set.
+- Rate limits and login throttling are in memory per API process (reset on restart; not shared across instances). SSE streams and AI single-flight also assume one API instance.
+- Attachments are stored on local disk under random keys outside any served path; they must be backed up with the database. Antivirus scanning is not implemented.
+- AI data minimisation: the provider receives only the ticket subject/description, the last two author-visible messages, public policy excerpts and non-financial book facts (title, status, genre, publication date, print partner, channels). Author name/email/phone/city, ISBN, MRP, royalty amounts and balances, copies sold and payout dates are never sent (allowlist in `apps/api/src/ai/context.ts`, repeated in `packages/ai`). Royalty drafts say the team will verify the figures internally; any amount a draft invents is rejected by the grounding check.
+- A missing `Origin` header is accepted on mutating requests (non-browser clients); the CSRF token is still required.
+- `TicketMessage` rows are append-only by convention (no edit route) but not DB-trigger protected; `AuditLog` and `InternalNote` are.
+- Verified on Windows only. Linux/Docker and real reverse-proxy runs are not yet exercised.
 
 ## Confidential source data
 
-The original assignment PDF and JSON stay unchanged under ignored `reference/`. The local copy `data/bookleaf_sample_data.json` contains confidential personal and royalty data and is also ignored. It must remain untracked until the owner verifies repository visibility and publication permissions; a private repository alone is not publication permission. No confidential sample records belong in commits, logs, tests, screenshots, or documentation. Use wholly synthetic fixtures for shareable demos and tests. `private: true` prevents npm publication, not Git disclosure.
+The original assignment PDF and JSON stay unchanged under ignored `reference/`; `data/bookleaf_sample_data.json` (confidential, ignored by git) is never committed. Use only synthetic data (`data/synthetic_seed.json`) for demos, tests and screenshots.
 
-## Design and ownership
+## Documentation
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [API response shapes and schema names](docs/API_CONTRACT.md)
-- [Database and AI persistence mapping](docs/DATABASE_SCHEMA.md)
-- [AI grounding and mandatory review policy](docs/AI_DESIGN.md)
-- [Agent ownership and pending work](docs/AGENT_HANDOFF.md)
-- [Verification and future acceptance criteria](docs/INTEGRATION_CHECKLIST.md)
-
-The project owner controls all staging, commits, pushes, branches, worktrees, and deployment decisions. Phase 1 corrections stop at the scaffold; no deployment or VPS access is involved.
+- [Architecture](docs/ARCHITECTURE.md) · [API contract](docs/API_CONTRACT.md) · [Database schema](docs/DATABASE_SCHEMA.md) · [AI design](docs/AI_DESIGN.md)
+- [Integration report and demo checklist](docs/INTEGRATION_REPORT.md)
