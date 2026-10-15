@@ -1,0 +1,115 @@
+# BookLeaf staging stack. Project name "bookleaf" keeps containers, networks and volumes isolated from other apps on the host.
+# Usage (from the directory containing this file and a filled-in .env):  docker compose up -d --build
+# Traefik (already running on the host) terminates TLS and routes by Docker labels; nothing is published on host ports.
+name: bookleaf
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: bookleaf-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: bookleaf
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: bookleaf
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    volumes:
+      - bookleaf_pgdata:/var/lib/postgresql/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bookleaf -d bookleaf"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/docker/api.Dockerfile
+    image: bookleaf-api:${BOOKLEAF_TAG:-local}
+    container_name: bookleaf-api
+    restart: unless-stopped
+    depends_on:
+      db: { condition: service_healthy }
+    environment: &api-env
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgresql://bookleaf:${POSTGRES_PASSWORD}@db:5432/bookleaf?schema=public
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET}
+      WEB_ORIGIN: https://${BOOKLEAF_HOST:?set BOOKLEAF_HOST}
+      TRUST_PROXY: "1"
+      ATTACHMENT_DIR: /data/attachments
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+    volumes:
+      - bookleaf_attachments:/data/attachments
+    networks: [internal, edge]
+    mem_limit: 512m
+    logging: *logging
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: bookleaf_edge
+      traefik.http.routers.bookleaf-api.rule: Host(`${BOOKLEAF_HOST}`) && (PathPrefix(`/api/`) || Path(`/healthz`))
+      traefik.http.routers.bookleaf-api.priority: "100"
+      traefik.http.routers.bookleaf-api.entrypoints: websecure
+      traefik.http.routers.bookleaf-api.tls.certresolver: letsencrypt
+      traefik.http.routers.bookleaf-api.middlewares: bookleaf-hsts
+      traefik.http.services.bookleaf-api.loadbalancer.server.port: "3000"
+      traefik.http.middlewares.bookleaf-hsts.headers.stsSeconds: "31536000"
+
+  web:
+    build:
+      context: ..
+      dockerfile: infra/docker/web.Dockerfile
+    image: bookleaf-web:${BOOKLEAF_WEB_TAG:-${BOOKLEAF_TAG:-local}}
+    container_name: bookleaf-web
+    restart: unless-stopped
+    networks: [edge]
+    mem_limit: 64m
+    logging: *logging
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: bookleaf_edge
+      traefik.http.routers.bookleaf-web.rule: Host(`${BOOKLEAF_HOST}`)
+      traefik.http.routers.bookleaf-web.entrypoints: websecure
+      traefik.http.routers.bookleaf-web.tls.certresolver: letsencrypt
+      traefik.http.routers.bookleaf-web.middlewares: bookleaf-hsts
+      traefik.http.services.bookleaf-web.loadbalancer.server.port: "8080"
+
+  # One-shot jobs, not started by `up`:  docker compose run --rm migrate   /   docker compose run --rm seed
+  migrate:
+    image: bookleaf-api:${BOOKLEAF_TAG:-local}
+    profiles: [tools]
+    depends_on:
+      db: { condition: service_healthy }
+    environment: *api-env
+    working_dir: /repo
+    command: ["npm", "run", "migrate:deploy", "--workspace", "@bookleaf/db"]
+    networks: [internal]
+
+  seed:
+    image: bookleaf-api:${BOOKLEAF_TAG:-local}
+    profiles: [tools]
+    depends_on:
+      db: { condition: service_healthy }
+    environment:
+      <<: *api-env
+      BOOKLEAF_SEED_AUTHOR_PASSWORD: ${BOOKLEAF_SEED_AUTHOR_PASSWORD:?set BOOKLEAF_SEED_AUTHOR_PASSWORD}
+      BOOKLEAF_SEED_ADMIN_EMAIL: ${BOOKLEAF_SEED_ADMIN_EMAIL:?set BOOKLEAF_SEED_ADMIN_EMAIL}
+      BOOKLEAF_SEED_ADMIN_PASSWORD: ${BOOKLEAF_SEED_ADMIN_PASSWORD:?set BOOKLEAF_SEED_ADMIN_PASSWORD}
+    working_dir: /repo
+    command: ["npm", "run", "seed:synthetic", "--workspace", "@bookleaf/db"]
+    networks: [internal]
+
+networks:
+  internal:
+    internal: true # no route to the internet or to other stacks; holds the database
+  edge: {}
+
+volumes:
+  bookleaf_pgdata:
+  bookleaf_attachments:

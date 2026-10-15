@@ -52,3 +52,6 @@ reference/
 *.log
 .DS_Store
 Thumbs.db
+
+# Server-side backups created by infra/scripts/backup.sh
+infra/backups/
