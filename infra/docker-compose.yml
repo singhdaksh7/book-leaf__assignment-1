@@ -45,6 +45,7 @@ services:
       ATTACHMENT_DIR: /data/attachments
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
     volumes:
       - bookleaf_attachments:/data/attachments
     networks: [internal, edge]
@@ -79,6 +80,35 @@ services:
       traefik.http.routers.bookleaf-web.tls.certresolver: letsencrypt
       traefik.http.routers.bookleaf-web.middlewares: bookleaf-hsts
       traefik.http.services.bookleaf-web.loadbalancer.server.port: "8080"
+
+  # DEMONSTRATION-ONLY AI stand-in (opt-in, never part of a real deployment). Start with:  docker compose --profile demo up -d mock-ai
+  # then set OPENROUTER_BASE_URL=http://127.0.0.1:8080/api/v1, a dummy OPENROUTER_API_KEY and OPENROUTER_MODEL=demo/mock-not-a-real-model
+  # in .env and recreate the api. The AI package only accepts plain http for 127.0.0.1/localhost, so the mock shares the API
+  # container's network namespace and listens on loopback there: it has no network, address or published port of its own.
+  # It refuses to start without MOCK_AI_ACK.
+  mock-ai:
+    image: node:22-bookworm-slim
+    container_name: bookleaf-mock-ai
+    profiles: [demo]
+    restart: unless-stopped
+    network_mode: "service:api"
+    depends_on:
+      api: { condition: service_started }
+    user: node
+    environment:
+      MOCK_AI_ACK: demonstration-only
+      PORT: "8080"
+    volumes:
+      - ./mock-ai/server.mjs:/app/server.mjs:ro
+    command: ["node", "/app/server.mjs"]
+    mem_limit: 64m
+    read_only: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging: *logging
 
   # One-shot jobs, not started by `up`:  docker compose run --rm migrate   /   docker compose run --rm seed
   migrate:
