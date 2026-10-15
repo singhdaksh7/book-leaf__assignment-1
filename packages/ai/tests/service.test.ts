@@ -8,7 +8,8 @@ import { fallbackDraft, greetingName } from "../src/drafting/fallback.js";
 import { UsageTracker } from "../src/usage.js";
 import { FAKE_KEY, jsonResponse, modelAnswer, okEnvelope, scriptedProvider, timeoutError, usageFixture } from "./helpers.js";
 
-const author = { name: "Jane Roe", phone: "999", city: "Pune" };
+// The phone sentinel must not be possible inside the random hex nonce of the <untrusted-...> delimiters (a bare "999" occasionally was).
+const author = { name: "Jane Roe", phone: "+999-ZZ-PHONE", city: "Pune" };
 const WRAP = (body: string) => `Dear {{authorFirstName}},\n\n${body}\n\nWarm regards,\nBookLeaf Author Support`;
 const draftAnswer = (body: string, citations: string[]) => ({ draft: WRAP(body), citations });
 const input = (subject: string, description: string, extra = {}) => ({ ticketId: "t1", subject, description, authorContext: author, ...extra });
@@ -71,7 +72,7 @@ describe.each(SCENARIOS)("analyzeTicket: $name", (s) => {
     expect(outcome.analysis.draftResponse).not.toContain("{{");
     expect(outcome.analysis.knowledgeBaseCitations).toContain(s.chunk);
     // The author's identity stays out of both prompts.
-    for (const call of provider.calls) for (const pii of ["Jane", "Roe", "999", "Pune"]) expect(call.user + call.system).not.toContain(pii);
+    for (const call of provider.calls) for (const pii of ["Jane", "Roe", author.phone, "Pune"]) expect(call.user + call.system).not.toContain(pii);
   });
 
   it("never sends exact financial data to the provider, even when the caller supplies it", async () => {
