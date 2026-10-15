@@ -5,7 +5,7 @@ Isolated Docker Compose project (`bookleaf`) behind the host's existing Traefik.
 
 | Piece | Detail |
 | --- | --- |
-| Directory | `/opt/bookleaf` (code in `/opt/bookleaf/src`, runtime env in `/opt/bookleaf/src/infra/.env`, mode 600) |
+| Directory | `/opt/bookleaf/src/infra` holds only the deployment files (compose files, Dockerfiles for reference, `mock-ai`, scripts) and the runtime `.env` (mode 600). The application source is **not** on the server and there is no git checkout there: images are built from a commit on a workstation and loaded (see Update). |
 | Containers | `bookleaf-db` (postgres:16-alpine), `bookleaf-api`, `bookleaf-web` |
 | Networks | `bookleaf_internal` (internal-only, DB + API), `bookleaf_edge` (Traefik <-> API/web) |
 | Volumes | `bookleaf_bookleaf_pgdata`, `bookleaf_bookleaf_attachments` |
@@ -29,8 +29,13 @@ Images may be built on the server (`docker compose build`, use `nice -n 19`) or 
 ## Update
 
 ```bash
-cd /opt/bookleaf/src && git fetch && git checkout <tag-or-commit>
-cd infra && BOOKLEAF_TAG=<new-tag> docker compose build api web
+# On your workstation, at the commit to release (tag images with the short SHA so a running image can be traced to its commit):
+#   git checkout <commit> && T=$(git rev-parse --short HEAD)
+#   docker build -f infra/docker/api.Dockerfile -t bookleaf-api:$T . && docker build -f infra/docker/web.Dockerfile -t bookleaf-web:$T .
+#   docker save bookleaf-api:$T bookleaf-web:$T | gzip | ssh root@HOST 'gunzip | docker load'
+#   scp infra/docker-compose.yml infra/docker-compose.demo.yml root@HOST:/opt/bookleaf/src/infra/ && scp -r infra/mock-ai root@HOST:/opt/bookleaf/src/infra/
+# On the server (set BOOKLEAF_TAG / BOOKLEAF_WEB_TAG in .env or inline):
+cd /opt/bookleaf/src/infra
 ./scripts/backup.sh                                   # always before a migration
 BOOKLEAF_TAG=<new-tag> docker compose --profile tools run --rm migrate
 BOOKLEAF_TAG=<new-tag> docker compose up -d api web
@@ -69,11 +74,6 @@ docker compose up -d api
 `infra/mock-ai/server.mjs` stands in for OpenRouter so the real `@bookleaf/ai` pipeline (validation, grounding, admin review
 UI) can be demonstrated without a paid provider. It performs no AI: it keyword-matches the ticket and returns canned,
 policy-grounded text, labelled `[DEMO MOCK ...]` in the admin-visible rationale and `[DEMO DRAFT ...]` at the top of the draft.
-It refuses to start without `MOCK_AI_ACK=demonstration-only`, runs as a non-root user on a read-only filesystem and is not part
-of the default service set. The AI package accepts plain `http` only for `127.0.0.1`/`localhost`, so the mock shares the API
-container's network namespace (`network_mode: service:api`) and listens on loopback there: it has no network, IP address or
-published port of its own and only the API can reach it. Never enable it for a real deployment: leave `OPENROUTER_BASE_URL`
-at its default and the key empty so analyses record `AI_NOT_CONFIGURED` instead of fabricated output.
 
 How AI runs in each setting:
 
@@ -83,9 +83,27 @@ How AI runs in each setting:
 | Automated tests | Local mock HTTP servers inside the test suites | Scripted responses; no network, no cost |
 | Opt-in staging demo (this section) | `infra/mock-ai` | Canned keyword-matched text labelled `[DEMO MOCK]` / `[DEMO DRAFT]`; **not** AI inference |
 
+**How it is wired, and why.** The AI package accepts plain `http` only for `127.0.0.1`/`localhost`, so the API must reach the mock
+on loopback. `docker-compose.demo.yml` therefore runs the mock as a supervised background process **inside the API container**
+(`while true; do node /mock-ai/server.mjs; sleep 2; done & exec node dist/server.js`, API stays PID 1). It listens on `127.0.0.1:8080`
+only, so it has no container, address or published port of its own. It refuses to start without `MOCK_AI_ACK=demonstration-only`.
+The override sets the dummy key, model and loopback URL itself (not `.env`), so the demo cannot be half-enabled and a real key can
+never be combined with the mock.
+
+An earlier design ran the mock as a separate container sharing the API's network namespace (`network_mode: service:api`). It was
+abandoned after live and local testing: the mock is pinned to the API container's id and namespace, so a `docker restart` strands
+it in the old namespace and a **recreate** (`up --force-recreate`, `--no-deps`, or an image/env change) leaves it permanently unable
+to start, with neither a watchdog nor `depends_on: restart: true` able to repair it. Living inside the API container removes the
+coupling: whatever restarts, recreates or crash-restarts the API brings the mock with it, and a crash of the mock alone is retried
+after 2 s. Trade-off: the mock shares the API container's user, memory limit and (writable) filesystem; it mounts its code read-only.
+
 ```bash
-# in .env:  OPENROUTER_BASE_URL=http://127.0.0.1:8080/api/v1  OPENROUTER_API_KEY=demo-not-a-real-key  OPENROUTER_MODEL=demo/mock-not-a-real-model
-docker compose --profile demo up -d --no-build --no-deps api mock-ai   # recreates only the API, then starts the mock beside it
-# turn off: remove those three lines from .env, then
-docker compose --profile demo rm -sf mock-ai && docker compose up -d --no-build --no-deps api
+# enable (recreates only the API; the demo settings come from the override file, nothing to edit in .env)
+docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --no-build --no-deps api
+# disable (recreates only the API with the normal configuration; use the .env values for a real deployment)
+docker compose -f docker-compose.yml up -d --no-build --no-deps api
 ```
+
+Use the same `-f` pair for every later command that touches the API while the demo is enabled, otherwise Compose recreates the API
+without the mock and AI attempts record `AI_NOT_CONFIGURED`/`AI_NETWORK_ERROR`. Never enable it for a real deployment.
+Logs from the mock appear in `docker logs bookleaf-api` (method, path, status and category only; never prompt text).

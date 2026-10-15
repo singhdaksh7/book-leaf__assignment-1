@@ -69,4 +69,4 @@ The original assignment PDF and JSON stay unchanged under ignored `reference/`; 
 - [Architecture](docs/ARCHITECTURE.md) · [API contract](docs/API_CONTRACT.md) · [Database schema](docs/DATABASE_SCHEMA.md) · [AI design](docs/AI_DESIGN.md)
 - [Environment guide](docs/ENVIRONMENT.md) · [Testing](docs/TESTING.md) · [Demo instructions](docs/DEMO.md)
 - [Security review](docs/SECURITY_REVIEW.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Submission checklist](docs/SUBMISSION_CHECKLIST.md)
-- [Integration report](docs/INTEGRATION_REPORT.md)
+- [Docker deployment runbook](infra/DEPLOY.md) (production stack, backups, rollback, opt-in demo AI) · [Integration report](docs/INTEGRATION_REPORT.md)

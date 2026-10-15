@@ -11,6 +11,7 @@ All tests use synthetic data and disposable services. Nothing calls a paid API: 
 | `npm run build` | Production build of all workspaces | Node |
 | `npm test` | AI package, API (real PostgreSQL) and web (jsdom) suites | Node. The API suite starts a throwaway embedded PostgreSQL itself (or uses `TEST_DATABASE_URL`) and applies all 5 migrations |
 | `BOOKLEAF_AI_ENTRY=<absolute path>/packages/ai/dist/index.js npm run test --workspace @bookleaf/api` | Also runs the 11 "real AI package, mocked provider" tests that `npm test` skips | `npm run build` first |
+| `npm run test:infra` | Tests for the staging demo mock (`infra/mock-ai`): acknowledgement required, own-port loopback binding, all six categories, demo labels, citations, no invented money | Node |
 | `npm run test:scaffold` | Contract / Prisma / importer alignment | `npm run build` first |
 | `npm run test:e2e` | Browser end-to-end suite (Playwright) | see below |
 | `npm audit --omit=dev` | Dependency advisories for production dependencies | network |

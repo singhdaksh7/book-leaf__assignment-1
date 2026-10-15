@@ -31,3 +31,7 @@ Quick no-setup alternative: `npm run test:e2e` runs the whole flow below in a br
 6. **Boundaries**: as the author open `/admin/queue` -> *Access Restricted*; sign out, replay an old session cookie -> 401.
 
 Talking points: AI receives only the ticket text, the last two public messages, policy excerpts and non-financial book facts (no name, e-mail, phone, ISBN, royalty or sales figures); royalty drafts say the team will verify figures internally; every AI draft is reviewed by a human.
+
+## Reviewer access to the staging deployment
+
+A staging deployment runs the same code behind HTTPS (see [Deployment](../infra/DEPLOY.md)). Its demo AI is a **mock** that returns canned, labelled text (`[DEMO MOCK]` / `[DEMO DRAFT]`), not model inference. Demo credentials are never stored in this repository: the owner shares the staging URL and the synthetic admin/author logins with a reviewer out of band (for example a password manager share or an encrypted message) and can rotate them on the server by re-running the seed job with `BOOKLEAF_SEED_RESET_PASSWORDS=1`. The repository is private; grant the reviewer read access as a collaborator rather than sharing a token.
