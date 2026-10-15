@@ -11,8 +11,10 @@ export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [email, setEmail] = useState("author@bookleafpublishing.test");
-  const [password, setPassword] = useState("AuthorSecurePass123!");
+  // Demo credentials belong to the offline mock adapter only. Production builds and live-API runs start with empty fields.
+  const demoEnabled = !import.meta.env.PROD && isMockMode;
+  const [email, setEmail] = useState(demoEnabled ? "author@bookleafpublishing.test" : "");
+  const [password, setPassword] = useState(demoEnabled ? "AuthorSecurePass123!" : "");
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -109,7 +111,8 @@ export const LoginPage: React.FC = () => {
             </Button>
           </form>
 
-          {/* Quick Demo Credentials for Reviewers */}
+          {/* Quick Demo Credentials for Reviewers (offline mock mode only) */}
+          {demoEnabled && (
           <div className="mt-6 pt-6 border-t border-stone-100">
             <p className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-3 text-center">
               Quick Reviewer Credentials
@@ -132,12 +135,11 @@ export const LoginPage: React.FC = () => {
                 Demo Admin
               </button>
             </div>
-            {isMockMode && (
-              <p className="mt-3 text-[11px] text-center text-stone-400">
-                Operating with isolated synthetic mocks (API contracts compliant).
-              </p>
-            )}
+            <p className="mt-3 text-[11px] text-center text-stone-400">
+              Operating with isolated synthetic mocks (API contracts compliant).
+            </p>
           </div>
+          )}
         </div>
       </div>
     </div>
