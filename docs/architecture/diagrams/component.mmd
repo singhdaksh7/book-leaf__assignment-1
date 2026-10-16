@@ -1,0 +1,32 @@
+%% file: component.mmd
+flowchart TB
+    subgraph BROWSER["Browser"]
+        SPA["React SPA (Vite build)<br/>pages, API client, SSE client with polling fallback"]
+    end
+    subgraph WEBC["Container: web"]
+        NG["nginx-unprivileged :8080<br/>static assets"]
+    end
+    subgraph APIC["Container: api (Node 22, Express)"]
+        MW["Middleware: request id, headers, CORS/Origin,<br/>authenticate, CSRF, rate limits"]
+        RT["Routers: auth, author, admin, events"]
+        AT["Attachment store"]
+        HUB["TicketEventHub (SSE)"]
+        AAS["AiAttemptService"]
+        AIP["@bookleaf/ai<br/>classifier, drafter, safety, grounding,<br/>OpenRouter client"]
+        CON["@bookleaf/contracts (shared Zod schemas)"]
+        DBP["@bookleaf/db (Prisma client)"]
+    end
+    PG[("PostgreSQL 16")]
+    VOL[("attachments volume")]
+    OR(["OpenRouter API"])
+    SPA --> NG
+    SPA -- "/api/v1, cookies, X-CSRF-Token" --> MW --> RT
+    RT --> AT --> VOL
+    RT --> HUB
+    RT --> AAS --> AIP
+    AIP -- "HTTPS" --> OR
+    RT --> DBP --> PG
+    AAS --> DBP
+    RT -.-> CON
+    SPA -.-> CON
+    AIP -.-> CON

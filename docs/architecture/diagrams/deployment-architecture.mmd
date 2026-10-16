@@ -3,6 +3,7 @@ flowchart TB
     subgraph NET["Internet"]
         BR["Browsers<br/>HTTPS 443, HTTP 80 redirects"]
         LE["Let's Encrypt<br/>HTTP-01 challenge"]
+        ORP["OpenRouter API (HTTPS)<br/>real provider mode: free model only<br/>default google/gemma-4-31b-it:free"]
     end
 
     subgraph VPS["VPS 77.37.45.177 - Ubuntu 24.04, 1 vCPU, 3.9 GiB RAM, 2 GiB swap, 48 GB disk"]
@@ -13,7 +14,7 @@ flowchart TB
         subgraph PROJ["Compose project bookleaf  (/opt/bookleaf/src/infra)"]
             subgraph EDGE["network bookleaf_edge"]
                 WEB["web<br/>nginx-unprivileged :8080<br/>mem 64 MiB"]
-                API["api  :3000<br/>Node 22 + Express<br/>mem 512 MiB<br/>[demo override: supervised mock on 127.0.0.1:8080]"]
+                API["api  :3000<br/>Node 22 + Express<br/>mem 512 MiB<br/>[OPTIONAL demo override only: supervised mock on 127.0.0.1:8080,<br/>needs MOCK_AI_ACK=demonstration-only; staging currently runs this]"]
             end
             subgraph INT["network bookleaf_internal (internal: true)"]
                 DB[("db<br/>postgres:16-alpine, UTF8<br/>mem 512 MiB")]
@@ -21,7 +22,7 @@ flowchart TB
             VPG[("volume bookleaf_bookleaf_pgdata")]
             VAT[("volume bookleaf_bookleaf_attachments<br/>/data/attachments")]
             ENV[".env (mode 600)<br/>secrets, never in git"]
-            BK["backups/ (mode 700)<br/>pg_dump + attachments tar<br/>manual, no schedule"]
+            BK["backups/ (mode 700)<br/>encrypted pg_dump + attachments tar<br/>manual run only: no schedule installed, no off-host copy"]
         end
     end
 
@@ -30,6 +31,7 @@ flowchart TB
     TR -- "Host rule" --> WEB
     TR -- "Host + /api/* or /healthz  priority 100" --> API
     API -- "SQL" --> DB
+    API -- "HTTPS, bearer key from env (real mode)" --> ORP
     DB --- VPG
     API --- VAT
     ENV -. "compose interpolation" .-> API

@@ -1,0 +1,28 @@
+%% file: backup-architecture.mmd
+flowchart TB
+    subgraph HOST["VPS (compose project bookleaf)"]
+        DB[("bookleaf-db")]
+        VOL[("attachments volume (read-only mount)")]
+        SCR["infra/scripts/backup.sh<br/>(manual today; cron example provided, NOT installed)"]
+        PASS[/"BACKUP_PASSPHRASE_FILE (mode 600)"/]
+        subgraph STORE["backups/ (mode 700)"]
+            DAILY["daily/ keep 7"]
+            WEEKLY["weekly/ keep 4 (Sundays)"]
+            MONTHLY["monthly/ keep 3 (day 1)"]
+            STATUS["last-status.json"]
+        end
+        RT["infra/scripts/restore-test.sh"]
+        TMP["disposable postgres container<br/>internal network, tmpfs, removed after test"]
+    end
+    OFF[("Off-host store via rclone<br/>NOT CONFIGURED: no destination chosen")]
+    HOOK(["Optional alert webhook (failure)"])
+    DB -- "pg_dump (custom format) | openssl AES-256, PBKDF2" --> SCR
+    VOL -- "tar czf | openssl AES-256" --> SCR
+    PASS --> SCR
+    SCR -- "verify: decrypt, pg_restore --list, tar t, SHA-256" --> DAILY
+    DAILY --> WEEKLY
+    DAILY --> MONTHLY
+    SCR --> STATUS
+    SCR -. "only if BACKUP_REMOTE set; encrypted files only" .-> OFF
+    SCR -. "on failure" .-> HOOK
+    DAILY --> RT --> TMP

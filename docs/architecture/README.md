@@ -18,9 +18,10 @@ checked against the source and what could not be checked. Diagrams are Mermaid b
 | 10 | [API reference](10-API-REFERENCE.md) | Endpoint inventory (`openapi.yaml` is the machine-readable form) |
 | 11 | [Deployment architecture](11-DEPLOYMENT-ARCHITECTURE.md) | VPS topology, release flow, backup and rollback |
 | 12 | [Data flow diagrams](12-DATA-FLOW-DIAGRAMS.md) | Ticket creation, admin reply, AI boundary, data classification |
+| 13 | [DFD levels, UML, security, backup, AI provider](13-DFD-UML-SECURITY-BACKUP.md) | DFD 0/1/2, use case, domain classes, activity, component, security, backup, real vs demo AI |
 | 14 | [Non-functional requirements](14-NON-FUNCTIONAL-REQUIREMENTS.md) | Properties implemented, evidence, what was not measured |
 | 15 | [Testing architecture](15-TESTING-ARCHITECTURE.md) | Test layers, commands, results, pitfalls |
 | 17 | [Known limitations](17-KNOWN-LIMITATIONS.md) | Limitations and unverified areas |
 | - | [Verification report](ARCHITECTURE_VERIFICATION_REPORT.md) | How the documents were validated |
 
-Numbers 01, 13 and 16 are not used (no content exists for them); the existing numbering is kept so cross-references stay valid.
+Numbers 01 and 16 are not used (no content exists for them); the existing numbering is kept so cross-references stay valid.

@@ -1,0 +1,25 @@
+%% file: usecase.mmd
+flowchart LR
+    AU(["Author"])
+    AD(["Administrator"])
+    AI(["OpenRouter<br/>(secondary actor)"])
+    subgraph SYS["BookLeaf Author Support Portal"]
+        UC1(["Sign in / out"])
+        UC2(["View own books"])
+        UC3(["Create ticket"])
+        UC4(["Attach file"])
+        UC5(["Reply to ticket"])
+        UC6(["Follow ticket updates live"])
+        UC7(["Browse and filter queue"])
+        UC8(["Change status, category, priority"])
+        UC9(["Reply to author"])
+        UC10(["Write internal note"])
+        UC11(["Assign ticket to self"])
+        UC12(["Review AI analysis and draft"])
+        UC13(["Run or re-run AI analysis"])
+    end
+    AU --- UC1 & UC2 & UC3 & UC5 & UC6
+    UC3 -. "include (optional)" .-> UC4
+    AD --- UC1 & UC7 & UC8 & UC9 & UC10 & UC11 & UC12 & UC13 & UC6
+    UC13 -. "include" .-> AI
+    UC12 -. "extend: admin edits the draft, then UC9" .-> UC9

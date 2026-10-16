@@ -1,0 +1,26 @@
+%% file: class-domain.mmd
+classDiagram
+    direction LR
+    class User { id; email; passwordHash; role UserRole }
+    class AuthorProfile { id; externalAuthorId; name; phone; city; joinedDate }
+    class Session { id; tokenHash; expiresAt }
+    class Book { id; title; status; royaltyPending; lastRoyaltyPayoutDate }
+    class Ticket { id; subject; description; status; category; priority; createdAt }
+    class TicketMessage { id; body; visibility MessageVisibility }
+    class InternalNote { id; body }
+    class TicketAssignment { id; assignedAt }
+    class TicketAttachment { id; fileName; contentType; sizeBytes; storageKey }
+    class AiAnalysis { id; status; model; promptVersion; category; priority; confidence; rationale; draftResponse; citations; errorCode }
+    class AuditLog { id; action; metadata; createdAt }
+    User "1" --> "0..1" AuthorProfile : has
+    User "1" --> "*" Session : owns
+    AuthorProfile "1" --> "*" Book : owns
+    AuthorProfile "1" --> "*" Ticket : opens
+    Book "1" --> "*" Ticket : about
+    Ticket "1" *-- "*" TicketMessage : contains
+    Ticket "1" *-- "*" InternalNote : admin-only
+    Ticket "1" *-- "*" TicketAssignment : assigned
+    Ticket "1" *-- "*" TicketAttachment : has
+    Ticket "1" *-- "*" AiAnalysis : attempts
+    Ticket "1" *-- "*" AuditLog : history
+    User "1" --> "*" TicketAssignment : assignee (ADMIN)

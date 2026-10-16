@@ -1,0 +1,21 @@
+%% file: security-architecture.mmd
+flowchart TB
+    NET(["Internet"]) --> FW["Host firewall: 22, 80, 443"]
+    FW --> TLS["Traefik: TLS (Let's Encrypt), HSTS header"]
+    TLS --> NGX["web: static files only"]
+    TLS --> L1
+    subgraph APIL["API defences, in request order"]
+        L1["Request id + security headers (no framework banner, no-store on API data)"]
+        L2["Origin check against WEB_ORIGIN (state-changing and login)"]
+        L3["Session authentication: cookie token to SHA-256 lookup, fixed expiry"]
+        L4["CSRF: X-CSRF-Token must equal HMAC(SESSION_SECRET, session id)"]
+        L5["Rate limits: login (IP and account), ticket create, replies"]
+        L6["Zod validation; unknown query keys rejected"]
+        L7["Role guard: requireAuthor / requireRole(ADMIN)"]
+        L8["Ownership scope: authorId taken only from the session; foreign ids answer 404"]
+        L1 --> L2 --> L3 --> L4 --> L5 --> L6 --> L7 --> L8
+    end
+    L8 --> DBL["PostgreSQL on an internal-only network;<br/>triggers enforce book/author match and ADMIN-only assignees"]
+    L8 --> FS["Uploads: size/type checks, stored outside web root,<br/>served as forced downloads, traversal names neutralised"]
+    L8 --> AIB["AI boundary: provider output is untrusted,<br/>validated against shared schema, never sends anything"]
+    SEC[/"Secrets: env only (SESSION_SECRET, POSTGRES_PASSWORD, OPENROUTER_API_KEY).<br/>API refuses placeholder secrets in production. Argon2id password hashes."/] -.-> APIL

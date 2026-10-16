@@ -1,0 +1,12 @@
+%% file: dfd-level0.mmd
+flowchart LR
+    AU(["Author"])
+    AD(["Administrator"])
+    OR(["OpenRouter<br/>(external AI provider)"])
+    P0(("0<br/>BookLeaf Author Support<br/>and Communication Portal"))
+    AU -- "credentials, tickets, replies, attachments" --> P0
+    P0 -- "own books, ticket history, admin replies, live updates" --> AU
+    AD -- "credentials, status and priority changes, replies, internal notes, assignment, AI requests" --> P0
+    P0 -- "queue, ticket workbench, AI analysis and draft, live updates" --> AD
+    P0 -- "minimised ticket text and policy excerpts (HTTPS, API key in header)" --> OR
+    OR -- "classification and draft as JSON (untrusted)" --> P0
