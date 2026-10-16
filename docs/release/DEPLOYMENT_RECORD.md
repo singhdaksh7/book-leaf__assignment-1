@@ -77,6 +77,17 @@ Installed `/etc/cron.d/bookleaf-backup` (root, 644; the reviewed example unchang
 
 After deployment: `bookleaf-api`, `bookleaf-web`, `bookleaf-db` healthy, 0 restarts, `/healthz` 200, no application errors in the log except the recorded AI rate limits. The 15 other containers (daxul_labs, kp, printout, traefik, vastraa, including two long-exited one-shot migrate jobs) match the pre-deployment baseline exactly in image id, start time, health and state. Disk 32% used.
 
+## Post-deployment follow-up (2026-10-16, same day)
+
+* **Pushed:** `e5df2e8` is the remote `integration/bookleaf-fullstack` head (normal fast-forward from `83184cd`; `main` untouched at `9366f16`).
+* **Live-test assertions corrected** (commit `fe463aa`, local until pushed):
+  * *Reopening:* `IN_PROGRESS -> OPEN` is allowed by design (only `CLOSED` is terminal; `docs/architecture/08-TICKET-LIFECYCLE.md`). The audit script asserted the opposite. It now asserts the reopen succeeds, returns to `IN_PROGRESS`, and that an unknown status value is rejected with 400; CLOSED terminality stays covered by `closed.mjs`.
+  * *Queue visibility:* the open queue has more than one page and its ordering is intentional, so a new ticket need not be on page 1. The script now walks the pages and still requires every item to be `OPEN` and the new ticket to be present.
+  * *UI journey:* the three AI-panel steps expected demo labels. They now accept either a real draft or an honest failed state, forbid any `[DEMO MOCK/DRAFT]` text unless `EXPECT_DEMO=1`, and still require human review, explicit send, no automatic message, and no AI or internal content visible to the author.
+  * Re-run against the live site: audit **49/49**, UI journey **16/16** (AI panel state recorded as `failed`, because the quota is exhausted).
+* **Defect found by that run (fixed locally, not deployed):** the deployed admin UI renders a FAILED AI attempt as "No AI analysis record generated yet for this ticket", indistinguishable from no attempt. Commit `f77e628` adds an `AiFailureNotice` (error code, plain reason, "no draft was generated and nothing was sent") with 3 tests (web suite 53 passing, typecheck clean). **It needs a new web image and your approval to deploy.**
+* **Pending, time-dependent verification:** (a) real AI on the live site after the quota resets at 2026-10-17T00:00Z; (b) the first scheduled backup at 2026-10-17T02:30Z. Follow-up checks are scheduled for 05:42 IST and 08:12 IST on 2026-10-17 (session-only schedules); if the session is closed they must be run by hand with the commands in this record and `BACKUP_AND_RECOVERY.md`.
+
 ## Remaining limitations
 
 Real AI on the live site unverified (quota); free tier capacity about 25 analyses a day; no off-host backup; first scheduled backup not yet observed; pending host reboot and updates (not touched); host prune cron unchanged (rollback images protected by anchors, not by changing the cron); `/opt/bookleaf/src` is still not a git checkout (the release files were installed individually); duplicate-ticket race (BUG-002), page-local admin search and the trigger gap remain deferred.
