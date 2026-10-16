@@ -21,7 +21,10 @@ import { captureLogger } from "./m3helpers.js";
  * or point BOOKLEAF_AI_ENTRY at a built dist/index.js. Without either, this suite is skipped (and reported as skipped).
  */
 const here = dirname(fileURLToPath(import.meta.url));
-const entry = process.env.BOOKLEAF_AI_ENTRY ?? resolve(here, "..", ".tmp", "ai-dist", "index.js");
+const legacyEntry = resolve(here, "..", ".tmp", "ai-dist", "index.js");
+// Default to the workspace package build (packages/ai/dist) so the suite runs after `npm run build -w @bookleaf/ai`.
+const workspaceEntry = resolve(here, "..", "..", "..", "packages", "ai", "dist", "index.js");
+const entry = process.env.BOOKLEAF_AI_ENTRY ?? (existsSync(legacyEntry) ? legacyEntry : workspaceEntry);
 const available = existsSync(entry);
 const sourceRef = available && existsSync(resolve(dirname(entry), ".source-ref")) ? readFileSync(resolve(dirname(entry), ".source-ref"), "utf8").trim() : "unknown";
 
