@@ -5,7 +5,7 @@ Before sending: attach the three files listed below (paths are in the final repo
 **To:** HR@bookleafpub.in
 **Subject:** Technical Assignment 1 Submission — Daksh Singh | Full-Stack Developer
 
-**Attachments:** `BookLeaf_One_Page_Approach_Daksh_Singh.pdf` (one page), `SOFTWARE_DESIGN_DOCUMENT.pdf` (30 pages), `system-architecture.png`
+**Attachments:** `BookLeaf_One_Page_Approach_Daksh_Singh.pdf` (one page), `BookLeaf_Software_Design_Document.pdf` (30 pages), `BookLeaf_System_Architecture.png`, `BookLeaf_Reviewer_Login_Credentials.pdf` (passwords for the demo)
 
 ---
 
@@ -14,8 +14,8 @@ Dear BookLeaf Team,
 Please find my submission for Technical Assignment 1, the Author Support and Communication Portal.
 
 **Live demo:** https://bookleaf.77.37.45.177.sslip.io
-**Logins:** a dedicated reviewer admin account and the ten authors from your dataset (`AUTH001` to `AUTH010`, with all 18 books). Because the logins contain passwords, they are in a separate Reviewer Access Guide that I will share through a private channel, not in this email. No API key is needed to use the demo.
-**Code:** private GitHub repository `singhdaksh7/book-leaf__assignment-1`, branch `main`. The repository is private; please send me the GitHub usernames of the reviewers and I will grant read access immediately. The README has a short reviewer quick start.
+**Logins:** a dedicated reviewer admin account and the ten authors from your dataset (`AUTH001` to `AUTH010`, with all 18 books). The login details (reviewer admin and two original sample authors) are in the attached `BookLeaf_Reviewer_Login_Credentials.pdf`; the repository contains no passwords. No API key is needed to use the demo.
+**Code:** public GitHub repository https://github.com/singhdaksh7/book-leaf__assignment-1 (branch `main`, as requested). The README has a short reviewer quick start and setup instructions.
 
 **What it does.** Authors register or log in, see their books with exact royalty figures and production status, and raise general or book-linked tickets with attachments. Admins work a queue with search and filters, assignment, internal notes, status changes and an audit history. For each ticket the AI classifies the category, scores the priority and drafts a reply grounded in your policies (80/20 split, quarterly payments within 45 days, the Rs 1,000 threshold, ISBN escalation, printing and distribution timelines). The admin edits and explicitly sends it; nothing is ever sent automatically.
 

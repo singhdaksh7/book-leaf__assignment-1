@@ -5,7 +5,7 @@ A support portal for BookLeaf Publishing. Authors raise tickets about their book
 | | |
 | --- | --- |
 | Live site | https://bookleaf.77.37.45.177.sslip.io |
-| Source | private GitHub repository `singhdaksh7/book-leaf__assignment-1`, branch `integration/bookleaf-fullstack` (access on request; see the cover email) |
+| Source | public GitHub repository https://github.com/singhdaksh7/book-leaf__assignment-1, branch `main` |
 | Live release | API `bookleaf-api:3eb1aff` (AI accuracy release, source commit `3eb1aff`), web `12edd72`, PostgreSQL 16 behind Traefik/HTTPS. The previous API image `12edd72` is kept as the one-command rollback. |
 | Accounts | **Ten sample author accounts and one admin account are provided in the separate credentials handoff (not in this repository).** The ten authors are the assignment's original `AUTH001`-`AUTH010` with all 18 books (`BK001`-`BK018`), imported unchanged (358 field comparisons, 0 mismatches). New authors can also register themselves (they start empty). The admin cannot be created through the site. |
 

@@ -7,7 +7,7 @@
 | Version | 1.1: adds author self-registration, the fixed-admin model, the production seed guard and the synthetic-data cleanup tool (matches branch `integration/bookleaf-fullstack`) |
 | Date | 2026-10-16 |
 | Status | Describes the implemented application. Items not implemented or not verified are stated as such. The registration release is implemented and tested locally but **not yet deployed**; production still runs the previous release |
-| Repository | private GitHub repository `singhdaksh7/book-leaf__assignment-1` |
+| Repository | public GitHub repository `singhdaksh7/book-leaf__assignment-1` |
 | Staging | https://bookleaf.77.37.45.177.sslip.io (runs API `3eb1aff` and web `12edd72` with the real OpenRouter provider and self-registration; the assignment's 10 authors and 18 books are imported (358 field comparisons against the original JSON, 0 mismatches) alongside older synthetic test records, which are inventoried but not deleted; the free daily AI quota was exhausted on 2026-10-16, so live AI analyses end with a visible rate-limit notice, see §16 and §21) |
 
 **Reading note.** Every statement describes code that exists in the repository. Where a capability was tested only with mocks, or not tested, the text says so. Detailed per-component documents are in `docs/architecture/`; this document summarises them and links the diagrams.
