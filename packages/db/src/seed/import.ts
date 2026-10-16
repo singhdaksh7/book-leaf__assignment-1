@@ -1,5 +1,6 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { hashPassword } from "../password.js";
+import { SYNTHETIC_AUTHOR_EMAILS, SYNTHETIC_AUTHOR_ID, SYNTHETIC_SEED_ACK } from "../synthetic.js";
 import type { SeedDataset } from "./schema.js";
 
 export interface SeedCredentials {
@@ -14,6 +15,8 @@ export interface SeedCredentials {
 export interface SeedOptions {
   credentials: SeedCredentials;
   hash?: (password: string) => Promise<string>;
+  /** Environment used for the production guard (tests inject it; defaults to process.env). */
+  env?: Record<string, string | undefined>;
 }
 
 export interface SeedSummary {
@@ -33,6 +36,24 @@ export class SeedConflictError extends Error {
   }
 }
 
+/** True when any author in the dataset is a known synthetic identity (by external id or reserved test email). */
+export function isSyntheticDataset(dataset: SeedDataset): boolean {
+  return dataset.some((author) => SYNTHETIC_AUTHOR_ID.test(author.author_id) || SYNTHETIC_AUTHOR_EMAILS.includes(author.email.trim().toLowerCase()));
+}
+
+/**
+ * Production must never be (re)populated with test accounts by accident. With NODE_ENV=production a synthetic dataset
+ * is refused unless BOOKLEAF_ALLOW_SYNTHETIC_SEED carries the explicit acknowledgement.
+ */
+export function assertSeedAllowed(dataset: SeedDataset, env: Record<string, string | undefined> = process.env): void {
+  if (env.NODE_ENV === "production" && isSyntheticDataset(dataset) && env.BOOKLEAF_ALLOW_SYNTHETIC_SEED !== SYNTHETIC_SEED_ACK) {
+    throw new SeedConflictError(
+      "Refusing to seed synthetic test accounts into a production environment. Production accounts are created by public registration " +
+      "and by the admin tool (npm run admin:ensure). To override deliberately, set BOOKLEAF_ALLOW_SYNTHETIC_SEED=yes-i-understand."
+    );
+  }
+}
+
 const toDate = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 const toDateOrNull = (value: string | null): Date | null => (value === null ? null : toDate(value));
 export const normaliseEmail = (email: string): string => email.trim().toLowerCase();
@@ -44,6 +65,7 @@ export const normaliseEmail = (email: string): string => email.trim().toLowerCas
  */
 export async function importSeedData(prisma: PrismaClient, dataset: SeedDataset, options: SeedOptions): Promise<SeedSummary> {
   const { credentials } = options;
+  assertSeedAllowed(dataset, options.env);
   const hash = options.hash ?? ((password: string) => hashPassword(password));
   if (credentials.authorPassword.length < MIN_SEED_PASSWORD_LENGTH) throw new SeedConflictError(`Seed author password must be at least ${MIN_SEED_PASSWORD_LENGTH} characters`);
   const adminEmail = credentials.adminEmail ? normaliseEmail(credentials.adminEmail) : undefined;
