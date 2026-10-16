@@ -1,14 +1,13 @@
 # Bug register
 
-Audit period 2026-10-15/16, revision `88cad7a` plus local uncommitted work. Severity scale: BLOCKER / HIGH / MEDIUM / LOW / INFO.
-**No BLOCKER, HIGH or CRITICAL defect was found.** "Fixed locally" means a change exists in the working tree with a regression test but is
-**not committed, pushed or deployed** (owner approval required).
+Audit period 2026-10-15/16, revision `88cad7a`; BUG-004 was fixed in `a21b407` and deployed as `bookleaf-web:ee9b387`. Severity scale: BLOCKER / HIGH / MEDIUM / LOW / INFO.
+**No BLOCKER, HIGH or CRITICAL defect was found.** Everything else listed as open is unchanged and was not part of the frontend release.
 
 ## Product defects
 
 | ID | Sev | Finding | Evidence | Status |
 | --- | --- | --- | --- | --- |
-| BUG-004 | MEDIUM | **Dashboard KPIs are computed from one page of results.** Admin dashboard fetched 50 tickets and showed "Unresolved 50 / Awaiting assignment 40" when the API held 72 / 61; the author dashboard counted active tickets within the 25 most recent ("24 active support inquiry" for an author with 68). Any deployment with more than 50 open tickets (admin) or 25 (author) misreports workload | Reproduced on staging (76 tickets). Root cause: `AdminDashboardPage.tsx` and `author/DashboardPage.tsx` derive counts from `items`, not `total`. New tests `apps/web/src/test/dashboard-counts.test.tsx` failed before the fix and pass after | **Fixed locally.** Admin pages through the queue (100 per page, stops at the first page with no unresolved ticket, cap 2,000 shows "N+"); author uses the API's `status` filter totals. Web suite 48/48, typecheck and build clean |
+| BUG-004 | MEDIUM | **Dashboard KPIs are computed from one page of results.** Admin dashboard fetched 50 tickets and showed "Unresolved 50 / Awaiting assignment 40" when the API held 72 / 61; the author dashboard counted active tickets within the 25 most recent ("24 active support inquiry" for an author with 68). Any deployment with more than 50 open tickets (admin) or 25 (author) misreports workload | Reproduced on staging (76 tickets). Root cause: `AdminDashboardPage.tsx` and `author/DashboardPage.tsx` derive counts from `items`, not `total`. New tests `apps/web/src/test/dashboard-counts.test.tsx` failed before the fix and pass after | **Fixed and deployed** (commit `a21b407`, image `bookleaf-web:ee9b387`). Live dashboard check against the API with 101 unresolved tickets: **1/7 before, 7/7 after** (admin 50 -> 101, 40 -> 90; author 24 -> 68, 25 -> 72). Admin pages through the queue (100 per page, stops at the first page with no unresolved ticket, cap 2,000 shows "N+"); author uses the API's `status` filter totals. Web suite 48/48, typecheck and build clean |
 | BUG-006 | MEDIUM (operations) | **No backup schedule and no off-host copy.** Backups exist only because `scripts/backup.sh` was run by hand; they sit on the same disk as the data | `crontab -l` empty, no timer or cron entry mentions BookLeaf | Open. Needs an owner decision (cron/timer plus off-host copy and retention) |
 | BUG-001 | LOW | Login rejects an email with leading/trailing whitespace (HTTP 400, "Invalid login request") although the server trims and lower-cases afterwards. Pasted emails often carry a trailing space | `tests/live/api-matrix.mjs` KNOWN-ISSUE; `loginRequestSchema` validates `email()` before trimming | Open. Fix would be `z.string().trim().email()` in `packages/contracts` (a contract change) |
 | BUG-002 | LOW | `POST /author/tickets` has no idempotency: two concurrent identical requests create two tickets (replies do have duplicate protection). A double click in the UI sends one request, so only API retries/scripts trigger it | matrix KNOWN-ISSUE (201/201); UI double-click test sent 1 request | Open |
@@ -30,7 +29,7 @@ Audit period 2026-10-15/16, revision `88cad7a` plus local uncommitted work. Seve
 | BUG-014 | INFO | Host reports a pending reboot and 23 security-related package upgrades | Owner decision; not touched |
 | BUG-015 | INFO | The Aadya tenant (3 containers, volumes, networks, `/opt/aadya`) was removed from the VPS during the audit by a root SSH session that was not part of it (shell history shows `rm -rf /opt/aadya`). BookLeaf was unaffected. Cause and authorisation unknown | Needs owner confirmation |
 
-## Documentation defects (fixed locally, uncommitted)
+## Documentation defects (fixed and committed in `add8e07`)
 
 | ID | Finding | Fix |
 | --- | --- | --- |

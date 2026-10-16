@@ -1,6 +1,6 @@
 # End-to-end test report
 
-Revision under test: `88cad7a` (clean container builds) plus the local uncommitted work described in [BUG_REGISTER.md](BUG_REGISTER.md).
+Revision under test: `88cad7a` for sections 1-5 (clean container builds); section 6 covers the frontend release `ee9b387`.
 Live target: https://bookleaf.77.37.45.177.sslip.io, synthetic accounts only. Results were produced on 2026-10-15/16.
 
 ## 1. Automated suites (clean Linux containers built from the repository)
@@ -57,3 +57,19 @@ Audit history: the admin ticket view lists all 6 audit events produced by the ac
 ## 5. What was not covered
 
 Real OpenRouter inference; Firefox/Safari; load and capacity; accessibility tooling; certificate renewal; browser tests of the dashboards after the local fix (the fix is covered by unit tests only and is not deployed).
+
+## 6. Frontend release verification (2026-10-16, revision `ee9b387`)
+
+Final tests on the exact working tree before committing: web 48/48 (46 + 2 `dashboard-counts`), `tsc` clean for all workspaces and the e2e project, production build clean, scaffold 9/9, infra 12/12, **Playwright E2E 30/30**, compose valid (0 published ports), `git diff --check` clean. The two new tests were shown to fail on the previous implementation (stashed fix) and pass with it. Backend, contracts and AI code were not changed, so the API and AI suites were not re-run for this release (they passed fresh on Node 22 and 24 earlier on identical code).
+
+Live, against https://bookleaf.77.37.45.177.sslip.io after deploying `bookleaf-web:ee9b387` (only the web container recreated):
+
+| Check | Before | After |
+| --- | --- | --- |
+| `dashboard-counts.mjs` with 101 unresolved / 105 total tickets (more than one API page) and an author with 68 active / 72 total | 1/7 (admin 50 vs 101, 40 vs 90, 10 vs 11; author 24 vs 68, 25 vs 72) | **7/7** (101, 11, 90, 11, queue header 101, author 68, View All 72) |
+| `ui-journey.mjs` | 16/16 | 16/16 |
+| `ux-sweep.mjs` (5 viewports, 55 combinations incl. 390 and 360 px) | clean | clean: no overflow, console errors or failed requests |
+| `ui-forms.mjs` | - | 21/21, 1 known issue (BUG-005) |
+| `ai-live.mjs` (as author 10; author 1 had hit the 30-per-hour ticket limit, which responded 429 as designed) | 34/34 | 34/34 |
+
+Test-script changes made during verification (data and quota robustness, no product change): `ai-live.mjs` accepts `AUTHOR_EMAIL`; `ui-forms.mjs` resets its request log per step, compares admin filter results with the API row count, finds an author with no tickets for the empty-state check (skips if none), and reports BUG-005 as a known issue. Platform checks after the release: 0 restarts, 0 nginx/API errors, 0 crashes, no secrets in logs, 119 tickets / 25 attachments / 5 migrations intact, neighbours unchanged.
