@@ -88,6 +88,36 @@ After deployment: `bookleaf-api`, `bookleaf-web`, `bookleaf-db` healthy, 0 resta
 * **Defect found by that run (fixed locally, not deployed):** the deployed admin UI renders a FAILED AI attempt as "No AI analysis record generated yet for this ticket", indistinguishable from no attempt. Commit `f77e628` adds an `AiFailureNotice` (error code, plain reason, "no draft was generated and nothing was sent") with 3 tests (web suite 53 passing, typecheck clean). **It needs a new web image and your approval to deploy.**
 * **Pending, time-dependent verification:** (a) real AI on the live site after the quota resets at 2026-10-17T00:00Z; (b) the first scheduled backup at 2026-10-17T02:30Z. Follow-up checks are scheduled for 05:42 IST and 08:12 IST on 2026-10-17 (session-only schedules); if the session is closed they must be run by hand with the commands in this record and `BACKUP_AND_RECOVERY.md`.
 
+## Web-only hotfix: `AiFailureNotice` (2026-10-16, deployed from pushed commit `134f49b`)
+
+| Item | Value |
+| --- | --- |
+| Remote integration HEAD at deploy time | `134f49bfda069dfeeda03e20b670190ef06452ef` (fast-forward from `e5df2e8`; `main` untouched at `9366f16`) |
+| Runtime code changed since the `83184cd` release | `apps/web` only (`AiFailureNotice.tsx`, a 3-line wiring change in `AdminTicketDetailPage.tsx`, 3 tests). Backend, database, migrations and infrastructure: **0 files** |
+| Web image | `bookleaf-web:134f49b`, image id / digest `sha256:d4d38f2dfbaee0a9da49e23312e6fd0f51d1af4c835cba9dcfa600d0755cbb98`; built from `git archive 134f49b`; the id on the server matched the local build |
+| Recreated | **only `bookleaf-web`** (05:46:23Z). `bookleaf-api` (id, image `83184cd`, start 05:18:19Z, 0 restarts) and `bookleaf-db` are byte-identical to the pre-hotfix snapshot, as are the 15 neighbouring containers |
+| Config change | one line, `BOOKLEAF_WEB_TAG=134f49b` in the server `.env` (previous file kept as `.env.pre-webhotfix-134f49b`); OpenRouter key and provider settings untouched; no migration |
+| Pre-deployment gates | 53 web tests, typecheck and production build passed; fresh encrypted backup `20261016T054443Z` verified and restored in isolation (145 tickets, 196 AI attempts); running web image `5306ef3f2112` anchored (`bookleaf-rollback-web-5306ef3f2112`) and saved as `/opt/bookleaf/rollback/web-83184cd-20261016.tar.gz` (sha256 `ff06c380...e032`); all 5 anchors and the earlier tarball intact |
+
+**Live verification (existing failed attempts only; no model request, no ticket created by the check):** `tests/live/failure-notice-verify.mjs` 10/10: a FAILED attempt now shows `AI analysis failed (AI_RATE_LIMITED)` with "The AI provider's usage limit was reached", "No draft was generated and nothing was sent to the author", no Insert Draft button, Re-run AI available, message count unchanged by opening the page, no key/bearer/provider text in page or API, no demo labels, mobile 375x812 without overflow, a COMPLETED analysis still renders normally (that ticket is a historical mock-era record whose stored text carries demo labels), no script errors or unexpected 4xx/5xx (the anonymous login page's two expected 401 session probes are allow-listed explicitly). Regression scripts on the hotfixed site: audit 49/49, UI journey 16/16 (AI panel now reads `AI analysis failed (AI_RATE_LIMITED)`), dashboard totals 7/7, mobile sweep clean, forms 21/21, SSE 5/5.
+
+**Rollback of the hotfix only** (also at `/opt/bookleaf/rollback/ROLLBACK-WEBHOTFIX-134f49b.txt`):
+
+```bash
+cd /opt/bookleaf/src/infra
+sed -i 's/^BOOKLEAF_WEB_TAG=.*/BOOKLEAF_WEB_TAG=83184cd/' .env
+docker compose up -d --no-build --no-deps web      # image bookleaf-web:83184cd is anchored; offline copy: docker load < /opt/bookleaf/rollback/web-83184cd-20261016.tar.gz
+```
+
+**Historical data note:** older synthetic tickets created while the demo mock was active keep their stored `[DEMO MOCK]/[DEMO DRAFT]` analysis text. New attempts on this deployment never produce such text.
+
+## Pending verifications and how to run them by hand
+
+Scheduled follow-ups (05:42 and 08:12 IST on 2026-10-17) exist only inside the session that created them. If that session is closed, run:
+
+1. **Real AI** (only after 2026-10-17T00:00Z): one tiny quota probe with the key from `infra/.env`; if it answers `free-models-per-day`, stop and report BLOCKED. Otherwise `BL_AUTHOR_PW=... BL_ADMIN_PW=... AUTHOR_EMAIL=synthetic.author3@example.test node tests/live/real-ai-smoke.mjs` (about 12 model calls), then on the VPS read-only: `docker exec bookleaf-db psql -U bookleaf -d bookleaf -Atc "select model, status, \"errorCode\", count(*), sum(coalesce(\"costMicrounits\",0)) from \"AiAnalysis\" where \"createdAt\" > '<start>' group by 1,2,3"`; expect model `nvidia/nemotron-3-super-120b-a12b:free`, cost 0.
+2. **First scheduled backup** (after 2026-10-17T02:30Z): `tail /var/log/bookleaf-backup.log`; a new `db-*.dump.enc` / `attachments-*.tgz.enc` / `SHA256SUMS-*` set under `infra/backups/daily`; `sha256sum -c` it; `cat infra/backups/last-status.json`; `BACKUP_PASSPHRASE_FILE=/root/.bookleaf-backup-pass infra/scripts/restore-test.sh`; confirm earlier sets and the 8 legacy files are still present. The weekly restore test is configured for Monday 2026-10-19 03:30Z.
+
 ## Remaining limitations
 
 Real AI on the live site unverified (quota); free tier capacity about 25 analyses a day; no off-host backup; first scheduled backup not yet observed; pending host reboot and updates (not touched); host prune cron unchanged (rollback images protected by anchors, not by changing the cron); `/opt/bookleaf/src` is still not a git checkout (the release files were installed individually); duplicate-ticket race (BUG-002), page-local admin search and the trigger gap remain deferred.
