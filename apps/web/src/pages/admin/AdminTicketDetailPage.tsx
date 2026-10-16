@@ -761,11 +761,11 @@ export const AdminTicketDetailPage: React.FC = () => {
               </div>
               <div>
                 <span className="text-stone-500 block">Location / City</span>
-                <span className="text-stone-800">{author.city}</span>
+                <span className="text-stone-800">{author.city || <span className="text-stone-400">Not provided</span>}</span>
               </div>
               <div>
                 <span className="text-stone-500 block">Contact Phone</span>
-                <span className="font-mono text-stone-800">{author.phone}</span>
+                <span className="font-mono text-stone-800">{author.phone || <span className="font-sans text-stone-400">Not provided</span>}</span>
               </div>
             </CardContent>
           </Card>

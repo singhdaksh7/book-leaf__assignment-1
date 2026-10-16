@@ -1,10 +1,10 @@
 import { randomBytes } from "node:crypto";
 import { Router, type Response } from "express";
-import { loginRequestSchema, loginResponseSchema, meResponseSchema } from "@bookleaf/contracts";
+import { loginRequestSchema, loginResponseSchema, meResponseSchema, registerRequestSchema, registerResponseSchema } from "@bookleaf/contracts";
 import type { PrismaClient } from "@bookleaf/db";
 import { hashPassword, verifyPassword } from "@bookleaf/db/password";
 import type { AppConfig } from "../config.js";
-import { AppError, unauthenticated } from "../http/errors.js";
+import { AppError, forbidden, unauthenticated } from "../http/errors.js";
 import type { Logger } from "../http/logger.js";
 import { asyncHandler, parseInput } from "../http/validate.js";
 import { serializeCurrentUser } from "../serializers.js";
@@ -26,6 +26,10 @@ export function createAuthRouter({ prisma, config, logger, onSessionEnded, dummy
   const router = Router();
   const ipLimiter = new FailureLimiter(config.loginMaxFailures * 3, config.loginFailureWindowMs);
   const accountLimiter = new FailureLimiter(config.loginMaxFailures, config.loginFailureWindowMs);
+  // Registration counts every attempt (valid or not): the limiter's "failure" is simply one use of the allowance.
+  const registerWindowMs = 60 * 60_000;
+  const registerIpLimiter = new FailureLimiter(config.registerLimitPerIpPerHour, registerWindowMs);
+  const registerGlobalLimiter = new FailureLimiter(config.registerLimitGlobalPerHour, registerWindowMs);
 
   // Verifying against a dummy hash when the email is unknown keeps response time independent of account existence.
   let dummyHash: Promise<string> | undefined;
@@ -71,6 +75,65 @@ export function createAuthRouter({ prisma, config, logger, onSessionEnded, dummy
     res.status(200).json(loginResponseSchema.parse({ user: serializeCurrentUser(auth) }));
   }));
 
+  /**
+   * Public author self-registration. The role is fixed to AUTHOR here and is not part of the request contract (the schema
+   * is strict, so a supplied role/privilege field is a 400). Admin accounts exist only through the administrative process.
+   */
+  router.post("/register", asyncHandler(async (req, res) => {
+    // Like login, there is no session yet, so the Origin check is the CSRF guard.
+    assertTrustedOrigin(req, config);
+    if (req.auth) throw forbidden("Sign out before creating another account");
+
+    const ipKey = `reg:${req.ip ?? "unknown"}`;
+    const retryAfter = Math.max(registerIpLimiter.retryAfterSeconds(ipKey), registerGlobalLimiter.retryAfterSeconds("reg:global"));
+    if (retryAfter > 0) throw new AppError("RATE_LIMITED", "Too many sign-up attempts. Try again later.", undefined, { "Retry-After": String(retryAfter) });
+    registerIpLimiter.recordFailure(ipKey);
+    registerGlobalLimiter.recordFailure("reg:global");
+
+    const { name, email, password } = parseInput(registerRequestSchema, req.body, "registration request");
+
+    // Hash before touching the database so the response time does not depend on whether the email already exists.
+    const passwordHash = await hashPassword(password);
+    const joinedDate = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
+
+    let created: Awaited<ReturnType<typeof createAuthor>> | undefined;
+    // The unique index on User.email is the only duplicate guard (no check-then-insert race). The external id is random;
+    // a collision on it (practically impossible) is retried instead of surfacing as a conflict.
+    for (let attempt = 0; attempt < 3 && !created; attempt += 1) {
+      try {
+        created = await createAuthor(email, passwordHash, name, joinedDate);
+      } catch (error) {
+        const target = uniqueViolationTarget(error);
+        if (target === undefined) throw error;
+        if (target.includes("email")) {
+          logger.log("warn", "registration rejected: duplicate", { requestId: req.requestId });
+          throw new AppError("CONFLICT", "We could not create an account with these details. If you already have an account, sign in instead.");
+        }
+      }
+    }
+    if (!created) throw new AppError("INTERNAL_ERROR", "An unexpected error occurred");
+
+    const { token, sessionId, expiresAt } = await createSession(prisma, created.id, config.sessionTtlMs);
+    setSessionCookies(res, token, sessionId, expiresAt);
+    const auth = { sessionId, expiresAt, user: created, authorProfile: created.authorProfile };
+    res.status(201).json(registerResponseSchema.parse({ user: serializeCurrentUser(auth) }));
+  }));
+
+  async function createAuthor(email: string, passwordHash: string, name: string, joinedDate: Date) {
+    return prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          email, passwordHash, role: "AUTHOR",
+          // Profile columns the person has not provided are empty strings, not invented values.
+          authorProfile: { create: { externalAuthorId: `WEB-${randomBytes(8).toString("hex").toUpperCase()}`, name, phone: "", city: "", joinedDate } }
+        },
+        include: { authorProfile: true }
+      });
+      await tx.auditLog.create({ data: { actorId: user.id, action: "user.registered", entityType: "User", entityId: user.id, after: { role: "AUTHOR" } } });
+      return user;
+    });
+  }
+
   router.post("/logout", requireAuth, asyncHandler(async (req, res) => {
     await revokeSession(prisma, req.auth!.sessionId);
     onSessionEnded?.(req.auth!.sessionId);
@@ -86,4 +149,12 @@ export function createAuthRouter({ prisma, config, logger, onSessionEnded, dummy
   });
 
   return router;
+}
+
+/** Field names of a unique-constraint violation (Prisma P2002), or undefined for any other error. */
+function uniqueViolationTarget(error: unknown): string[] | undefined {
+  if (typeof error !== "object" || error === null || (error as { code?: unknown }).code !== "P2002") return undefined;
+  const target = (error as { meta?: { target?: unknown } }).meta?.target;
+  if (Array.isArray(target)) return target.map(String);
+  return typeof target === "string" ? [target] : [];
 }

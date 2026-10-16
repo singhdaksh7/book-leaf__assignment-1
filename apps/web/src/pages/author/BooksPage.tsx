@@ -219,7 +219,7 @@ export const BooksPage: React.FC = () => {
           description={
             searchQuery || selectedGenre !== "ALL" || selectedStatus !== "ALL"
               ? "No titles matched your active search or filter criteria."
-              : "No books are linked to your author profile."
+              : "No books are linked to your account yet. If you have published with BookLeaf, raise a support ticket and the team will help."
           }
           action={
             (searchQuery || selectedGenre !== "ALL" || selectedStatus !== "ALL") && (

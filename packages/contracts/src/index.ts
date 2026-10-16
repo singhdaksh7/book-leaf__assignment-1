@@ -19,6 +19,40 @@ export const apiErrorSchema = z.object({
 export type ApiError = z.infer<typeof apiErrorSchema>;
 
 export const loginRequestSchema = z.object({ email: z.string().trim().email(), password: z.string().min(1) });
+
+// Public author self-registration. The shape is strict on purpose: any extra key (role, isAdmin, userId, ...) is a
+// validation error, never silently ignored. The server decides the role; the client has no say in it.
+export const PASSWORD_MIN_LENGTH = 12;
+export const PASSWORD_MAX_LENGTH = 128;
+const commonPasswords = new Set([
+  "password1234", "password12345", "passw0rd1234", "qwerty123456", "qwertyuiop12", "letmein12345", "welcome12345", "iloveyou1234",
+  "administrator", "123456789012", "abcd12345678", "changeme1234", "bookleaf1234"
+]);
+
+/** Human-readable policy failures (empty when the password is acceptable). Shared by the form and the server. */
+export function passwordPolicyIssues(password: string, email?: string): string[] {
+  const issues: string[] = [];
+  if (password.length < PASSWORD_MIN_LENGTH) issues.push(`Use at least ${PASSWORD_MIN_LENGTH} characters.`);
+  if (password.length > PASSWORD_MAX_LENGTH) issues.push(`Use at most ${PASSWORD_MAX_LENGTH} characters.`);
+  if (!/[a-z]/.test(password)) issues.push("Include a lowercase letter.");
+  if (!/[A-Z]/.test(password)) issues.push("Include an uppercase letter.");
+  if (!/[0-9]/.test(password)) issues.push("Include a number.");
+  const lowered = password.toLowerCase();
+  if (commonPasswords.has(lowered)) issues.push("This password is too common.");
+  const local = email?.split("@")[0]?.toLowerCase() ?? "";
+  if (local.length >= 4 && lowered.includes(local)) issues.push("Do not include your email name in the password.");
+  return issues;
+}
+
+export const registerRequestSchema = z.object({
+  name: z.string().trim().min(2, "Enter your full name.").max(100, "Name is too long.").regex(/^[^\p{C}<>]+$/u, "Name contains characters that are not allowed."),
+  email: z.string().trim().toLowerCase().email("Enter a valid email address.").max(254, "Email address is too long."),
+  password: z.string().max(PASSWORD_MAX_LENGTH, `Use at most ${PASSWORD_MAX_LENGTH} characters.`),
+  confirmPassword: z.string()
+}).strict().superRefine((value, ctx) => {
+  for (const message of passwordPolicyIssues(value.password, value.email)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["password"], message });
+  if (value.password !== value.confirmPassword) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["confirmPassword"], message: "Passwords do not match." });
+});
 export const createTicketSchema = z.object({
   bookId: z.string().min(1).nullable(), subject: z.string().trim().min(3).max(200), description: z.string().trim().min(10).max(10_000)
 });
@@ -48,6 +82,7 @@ export const currentUserSchema = z.object({
 export const authResponseSchema = z.object({ user: currentUserSchema });
 export const loginResponseSchema = authResponseSchema;
 export const meResponseSchema = authResponseSchema;
+export const registerResponseSchema = authResponseSchema;
 // Logout returns HTTP 204 with no JSON body.
 
 export const bookSchema = z.object({
@@ -120,6 +155,8 @@ export const adminTicketDetailResponseSchema = z.object({
 });
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
+/** Form input (before trimming/lower-casing). */
+export type RegisterRequest = z.input<typeof registerRequestSchema>;
 export type CreateTicketRequest = z.infer<typeof createTicketSchema>;
 export type UpdateTicketRequest = z.infer<typeof updateTicketSchema>;
 export type TicketReplyRequest = z.infer<typeof ticketReplySchema>;
@@ -131,6 +168,7 @@ export type CurrentUser = z.infer<typeof currentUserSchema>;
 export type AuthResponse = z.infer<typeof authResponseSchema>;
 export type LoginResponse = z.infer<typeof loginResponseSchema>;
 export type MeResponse = z.infer<typeof meResponseSchema>;
+export type RegisterResponse = z.infer<typeof registerResponseSchema>;
 export type Book = z.infer<typeof bookSchema>;
 export type Pagination = z.infer<typeof paginationSchema>;
 export type BookListResponse = z.infer<typeof bookListResponseSchema>;

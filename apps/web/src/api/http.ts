@@ -1,5 +1,6 @@
 import {
   loginResponseSchema,
+  registerResponseSchema,
   meResponseSchema,
   bookListResponseSchema,
   bookSchema,
@@ -16,6 +17,8 @@ import {
   apiErrorSchema,
   type LoginRequest,
   type LoginResponse,
+  type RegisterRequest,
+  type RegisterResponse,
   type MeResponse,
   type BookListResponse,
   type Book,
@@ -193,6 +196,13 @@ export class HttpApiClient implements ApiClient {
       method: "POST",
       body: JSON.stringify(request),
     }, loginResponseSchema);
+  }
+
+  async register(request: RegisterRequest): Promise<RegisterResponse> {
+    return this.request("/auth/register", {
+      method: "POST",
+      body: JSON.stringify(request),
+    }, registerResponseSchema);
   }
 
   async logout(): Promise<void> {

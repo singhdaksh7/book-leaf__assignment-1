@@ -1,6 +1,8 @@
 import type {
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
   MeResponse,
   BookListResponse,
   Book,
@@ -302,6 +304,22 @@ export class MockApiClient implements ApiClient {
         email: request.email,
       };
     }
+    return { user: this.currentUser };
+  }
+
+  /** Offline adapter only: mirrors the server's duplicate-email conflict for the two built-in demo identities. */
+  async register(request: RegisterRequest): Promise<RegisterResponse> {
+    await delay(250);
+    const email = request.email.trim().toLowerCase();
+    if (email === SYNTHETIC_AUTHOR_USER.email || email === SYNTHETIC_ADMIN_USER.email) {
+      throw new ApiClientError("CONFLICT", "We could not create an account with these details. If you already have an account, sign in instead.", 409);
+    }
+    this.currentUser = {
+      id: `usr_new_${Date.now()}`,
+      email,
+      role: "AUTHOR",
+      authorProfile: { id: `prof_new_${Date.now()}`, userId: `usr_new_${Date.now()}`, externalAuthorId: "WEB-MOCK", name: request.name.trim(), phone: "", city: "", joinedDate: new Date().toISOString().slice(0, 10) },
+    };
     return { user: this.currentUser };
   }
 

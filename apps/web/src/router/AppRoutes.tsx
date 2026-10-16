@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
 import { AppLayout } from "../components/layout/AppLayout";
 import { LoginPage } from "../pages/auth/LoginPage";
+import { RegisterPage } from "../pages/auth/RegisterPage";
 import { DashboardPage } from "../pages/author/DashboardPage";
 import { BooksPage } from "../pages/author/BooksPage";
 import { BookDetailPage } from "../pages/author/BookDetailPage";
@@ -19,6 +20,7 @@ export const AppRoutes: React.FC = () => {
     <Routes>
       {/* Public Route */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
 
       {/* Protected Routes (Author & Shared Workspace) */}
       <Route

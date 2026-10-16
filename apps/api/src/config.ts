@@ -21,7 +21,10 @@ const envSchema = z.object({
   ATTACHMENT_MAX_BYTES: z.coerce.number().int().min(1).max(25 * 1024 * 1024).default(5 * 1024 * 1024),
   ATTACHMENT_MAX_PER_TICKET: z.coerce.number().int().min(1).max(50).default(5),
   TICKET_CREATE_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(30),
-  AUTHOR_REPLY_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(60)
+  AUTHOR_REPLY_LIMIT_PER_HOUR: z.coerce.number().int().min(1).default(60),
+  /** Public registration attempts (valid or not) per client IP per hour, and across all clients per hour. */
+  REGISTER_LIMIT_PER_IP_PER_HOUR: z.coerce.number().int().min(1).default(5),
+  REGISTER_LIMIT_GLOBAL_PER_HOUR: z.coerce.number().int().min(1).default(200)
 });
 
 export interface AppConfig {
@@ -44,6 +47,8 @@ export interface AppConfig {
   attachmentMaxPerTicket: number;
   ticketCreateLimitPerHour: number;
   authorReplyLimitPerHour: number;
+  registerLimitPerIpPerHour: number;
+  registerLimitGlobalPerHour: number;
 }
 
 export class ConfigError extends Error {
@@ -82,6 +87,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     attachmentMaxBytes: value.ATTACHMENT_MAX_BYTES,
     attachmentMaxPerTicket: value.ATTACHMENT_MAX_PER_TICKET,
     ticketCreateLimitPerHour: value.TICKET_CREATE_LIMIT_PER_HOUR,
-    authorReplyLimitPerHour: value.AUTHOR_REPLY_LIMIT_PER_HOUR
+    authorReplyLimitPerHour: value.AUTHOR_REPLY_LIMIT_PER_HOUR,
+    registerLimitPerIpPerHour: value.REGISTER_LIMIT_PER_IP_PER_HOUR,
+    registerLimitGlobalPerHour: value.REGISTER_LIMIT_GLOBAL_PER_HOUR
   };
 }

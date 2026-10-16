@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import type { CurrentUser, LoginRequest } from "@bookleaf/contracts";
+import type { CurrentUser, LoginRequest, RegisterRequest } from "@bookleaf/contracts";
 import { getApiClient, type ApiClient, ApiClientError } from "../api";
 import { ticketEventManager } from "../api/events";
 
@@ -9,6 +9,7 @@ interface AuthContextType {
   error: string | null;
   client: ApiClient;
   login: (credentials: LoginRequest) => Promise<CurrentUser>;
+  register: (details: RegisterRequest) => Promise<CurrentUser>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isMockMode: boolean;
@@ -67,6 +68,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; initialClient?:
     }
   };
 
+  // Registration signs the new author in. Errors are rethrown for the form to present; they do not touch the global error state.
+  const register = async (details: RegisterRequest): Promise<CurrentUser> => {
+    const res = await client.register(details);
+    setUser(res.user);
+    ticketEventManager.init();
+    return res.user;
+  };
+
   const logout = async (): Promise<void> => {
     try {
       setIsLoading(true);
@@ -93,6 +102,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode; initialClient?:
         error,
         client,
         login,
+        register,
         logout,
         refreshUser,
         isMockMode: client.isMock,

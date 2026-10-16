@@ -196,7 +196,8 @@ async function main() {
     ...process.env, NODE_ENV: "development", PORT: String(API_PORT), DATABASE_URL: databaseUrl, SESSION_SECRET, WEB_ORIGIN, ATTACHMENT_DIR: attachmentDir,
     OPENROUTER_API_KEY: AI_KEY, OPENROUTER_BASE_URL: mockUrl, OPENROUTER_MODEL: "e2e/mock-model", AI_TIMEOUT_MS: "5000", AI_MAX_RETRIES: "0",
     // Generous ceilings: the suite logs in many times and creates tickets from one IP.
-    TICKET_CREATE_LIMIT_PER_HOUR: "500", AUTHOR_REPLY_LIMIT_PER_HOUR: "500", LOGIN_MAX_FAILURES: "100"
+    TICKET_CREATE_LIMIT_PER_HOUR: "500", AUTHOR_REPLY_LIMIT_PER_HOUR: "500", LOGIN_MAX_FAILURES: "100",
+    REGISTER_LIMIT_PER_IP_PER_HOUR: "500", REGISTER_LIMIT_GLOBAL_PER_HOUR: "1000"
   };
   spawnChild("api", [join(root, "apps", "api", "dist", "server.js")], { cwd: join(root, "apps", "api"), env: apiEnv });
   await waitFor(`${API_ORIGIN}/healthz`, "API");

@@ -1,6 +1,8 @@
 import type {
   LoginRequest,
   LoginResponse,
+  RegisterRequest,
+  RegisterResponse,
   MeResponse,
   BookListResponse,
   Book,
@@ -62,6 +64,8 @@ export interface ApiClient {
 
   // Auth
   login(request: LoginRequest): Promise<LoginResponse>;
+  /** Public author self-registration; signs the new author in. The role is chosen by the server (always AUTHOR). */
+  register(request: RegisterRequest): Promise<RegisterResponse>;
   logout(): Promise<void>;
   getCurrentUser(): Promise<MeResponse>;
 

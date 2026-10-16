@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Navigate, useNavigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Feather, Lock, Mail, ArrowRight, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/common/Button";
@@ -115,6 +115,13 @@ export const LoginPage: React.FC = () => {
               Sign In to Portal
             </Button>
           </form>
+
+          <p className="mt-6 text-center text-sm text-stone-600">
+            New to BookLeaf?{" "}
+            <Link to="/register" className="font-semibold text-brand-700 hover:text-brand-800 underline-offset-2 hover:underline">
+              Create account
+            </Link>
+          </p>
 
           {/* Quick Demo Credentials for Reviewers (offline mock mode only) */}
           {demoEnabled && (

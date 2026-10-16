@@ -214,7 +214,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             ) : books.length === 0 ? (
               <div className="p-8 text-center text-stone-500 text-sm">
-                No published books currently associated with this author account.
+                No books are linked to your account yet. If you have published with BookLeaf, raise a support ticket and the team will help.
               </div>
             ) : (
               <div className="divide-y divide-stone-100">
