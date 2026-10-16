@@ -14,11 +14,13 @@ export type ModelDraft = z.infer<typeof modelDraftSchema>;
 export function parseModelDraft(raw: string): ModelDraft {
   const result = modelDraftSchema.safeParse(extractJsonObject(raw));
   if (!result.success) throw new AiUnavailableError("AI draft failed schema validation", "AI_INVALID_OUTPUT");
-  const { draft } = result.data;
+  // Real models often write a generic "Dear Author," instead of the placeholder. Only a generic salutation (never a personal name) is
+  // normalised; the real first name is substituted after validation. Anything else, including "Dear John,", is still rejected.
+  const draft = result.data.draft.replace(/^Dear (?:Valued )?(?:Author|Writer),/i, `Dear ${GREETING_PLACEHOLDER},`);
   // Exactly one greeting placeholder at the start; no other template braces.
   const stripped = draft.replace(GREETING_PLACEHOLDER, "");
   if (!draft.startsWith(`Dear ${GREETING_PLACEHOLDER},`) || stripped.includes("{{")) {
     throw new AiUnavailableError("AI draft did not follow the required greeting format", "AI_INVALID_OUTPUT");
   }
-  return result.data;
+  return { ...result.data, draft };
 }

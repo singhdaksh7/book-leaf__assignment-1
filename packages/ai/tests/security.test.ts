@@ -156,7 +156,8 @@ describe("model output cannot trigger side effects", () => {
       expect(init.method).toBe("POST");
       expect(init.redirect).toBe("error");
       const body = JSON.parse(init.body as string);
-      expect(Object.keys(body).sort()).toEqual(["max_tokens", "messages", "model", "response_format", "temperature", "usage"]);
+      expect(Object.keys(body).sort()).toEqual(["max_tokens", "messages", "model", "reasoning", "response_format", "temperature", "usage"]);
+      expect(body.reasoning).toEqual({ enabled: false });
       expect(body).not.toHaveProperty("tools");
       expect(body).not.toHaveProperty("functions");
       expect(body).not.toHaveProperty("tool_choice");

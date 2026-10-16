@@ -68,12 +68,12 @@ for (const [expected, subject, description] of SCENARIOS.slice(0, limit)) {
       realModelDraft: m.draftSource === "model",
       categoryMatches: a.category === expected,
       humanReviewRequired: a.requiresHumanReview === true,
-      noInventedMoney: !/(?:₹|Rs\.?|INR|\$|USD)\s?\d/i.test(a.draftResponse ?? "")
+      noInventedMoney: !/(?:₹|\bRs\.?|\bINR\b|\$|\bUSD\b)\s?\d/i.test(a.draftResponse ?? "")
     };
     const ok = Object.values(checks).every(Boolean);
     failed ||= !ok;
     results.push({ expected, ok, got: a.category, priority: a.priority, confidence: a.confidence, latencyMs: Date.now() - started, tokens: m.totalTokens, fallbackReasons: m.fallbackReasons, checks });
-    console.log(`${ok ? "OK  " : "FAIL"} ${expected} -> ${a.category}/${a.priority} conf=${a.confidence} cls=${m.classificationSource} draft=${m.draftSource} tokens=${m.totalTokens} ${Date.now() - started}ms${ok ? "" : " " + JSON.stringify(checks)}`);
+    console.log(`${ok ? "OK  " : "FAIL"} ${expected} -> ${a.category}/${a.priority} conf=${a.confidence} cls=${m.classificationSource} draft=${m.draftSource} tokens=${m.totalTokens} reasons=[${m.fallbackReasons.join(",")}] ${Date.now() - started}ms${ok ? "" : " " + JSON.stringify(checks)}`);
   } catch (e) {
     failed = true;
     console.log(`FAIL ${expected}: ${e?.code ?? "ERROR"} (${e?.message ?? "unknown"})`);
@@ -82,6 +82,8 @@ for (const [expected, subject, description] of SCENARIOS.slice(0, limit)) {
   await new Promise((r) => setTimeout(r, 4000)); // stay far below 20 requests/minute
 }
 const model = config.model;
+const stage = (k) => results.filter((r) => r.checks?.[k]).length;
+console.log(`\nStages: model classification ${stage("realModelClassification")}/${results.length}, correct category ${stage("categoryMatches")}/${results.length}, model draft accepted ${stage("realModelDraft")}/${results.length}`);
 console.log(`\nREAL OPENROUTER TEST ${failed ? "FAILED" : "PASSED"} model=${model} analyses=${results.length}/${limit} ok=${results.filter((r) => r.ok).length}`);
 console.log(JSON.stringify({ model, provider: "openrouter", usage: tracker.summary?.() }, null, 0));
 process.exit(failed ? 1 : 0);

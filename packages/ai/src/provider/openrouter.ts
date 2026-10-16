@@ -121,6 +121,8 @@ export class OpenRouterProvider implements LlmProvider {
           model, temperature: request.temperature ?? 0,
           max_tokens: Math.min(request.maxOutputTokens ?? this.#config.maxOutputTokens, this.#config.maxOutputTokens),
           response_format: { type: "json_object" }, usage: { include: true },
+          // Classification/drafting need no chain-of-thought; hidden reasoning tokens would eat the output cap and yield empty content.
+          reasoning: { enabled: false },
           messages: [{ role: "system", content: request.system }, { role: "user", content: request.user }]
         })
       });
