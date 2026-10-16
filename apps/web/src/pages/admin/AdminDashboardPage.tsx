@@ -26,6 +26,8 @@ export const AdminDashboardPage: React.FC = () => {
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // True only if the safety cap below stopped paging while unresolved tickets remained; counts then show a trailing "+".
+  const [truncated, setTruncated] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -33,9 +35,26 @@ export const AdminDashboardPage: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const res = await client.getAdminTickets({ page: 1, pageSize: 50 });
+        // KPIs must cover every unresolved ticket, not just the first page. The queue lists unresolved tickets first, so paging
+        // can stop at the first page that contains none (the closed tail cannot change the figures).
+        const PAGE_SIZE = 100; // API maximum
+        const MAX_PAGES = 20; // safety cap: 2,000 tickets
+        let items: TicketSummary[] = [];
+        let capped = false;
+        for (let page = 1; ; page++) {
+          const res = await client.getAdminTickets({ page, pageSize: PAGE_SIZE });
+          items = items.concat(res.items);
+          const more = items.length < res.total;
+          const pageHasUnresolved = res.items.some((t) => t.status === "OPEN" || t.status === "IN_PROGRESS");
+          if (!more || !pageHasUnresolved) break;
+          if (page >= MAX_PAGES) {
+            capped = true;
+            break;
+          }
+        }
         if (isMounted) {
-          setTickets(res.items);
+          setTickets(items);
+          setTruncated(capped);
         }
       } catch (err: any) {
         if (isMounted) {
@@ -52,6 +71,8 @@ export const AdminDashboardPage: React.FC = () => {
       isMounted = false;
     };
   }, [client]);
+
+  const fmt = (n: number): string | number => (truncated ? `${n}+` : n);
 
   const metrics = useMemo(() => {
     const unresolved = tickets.filter(
@@ -94,7 +115,7 @@ export const AdminDashboardPage: React.FC = () => {
             size="sm"
             rightIcon={<ArrowRight className="w-4 h-4" />}
           >
-            Open Ticket Queue ({metrics.unresolvedCount})
+            Open Ticket Queue ({fmt(metrics.unresolvedCount)})
           </Button>
         </Link>
       </div>
@@ -113,28 +134,28 @@ export const AdminDashboardPage: React.FC = () => {
           <>
             <StatCard
               title="Unresolved Tickets"
-              value={metrics.unresolvedCount}
+              value={fmt(metrics.unresolvedCount)}
               subtitle="Open or in-progress inquiries"
               icon={<Clock className="w-5 h-5 text-sky-700" />}
               accentColor="sky"
             />
             <StatCard
               title="Urgent & Critical"
-              value={metrics.criticalCount}
+              value={fmt(metrics.criticalCount)}
               subtitle="High priority SLA attention"
               icon={<AlertTriangle className="w-5 h-5 text-red-700" />}
               accentColor="amber"
             />
             <StatCard
               title="Awaiting Assignment"
-              value={metrics.unassignedCount}
+              value={fmt(metrics.unassignedCount)}
               subtitle="Unallocated in staff queue"
               icon={<ShieldAlert className="w-5 h-5 text-amber-700" />}
               accentColor="amber"
             />
             <StatCard
               title="Assigned to Me"
-              value={metrics.assignedToMeCount}
+              value={fmt(metrics.assignedToMeCount)}
               subtitle="Under your active review"
               icon={<UserCheck className="w-5 h-5 text-emerald-700" />}
               accentColor="emerald"

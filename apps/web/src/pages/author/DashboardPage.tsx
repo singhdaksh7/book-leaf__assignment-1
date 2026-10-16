@@ -27,6 +27,9 @@ export const DashboardPage: React.FC = () => {
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Real totals from the API; the list above is only the 25 most recent tickets.
+  const [activeTotal, setActiveTotal] = useState<number | null>(null);
+  const [ticketTotal, setTicketTotal] = useState<number | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -35,14 +38,18 @@ export const DashboardPage: React.FC = () => {
       try {
         setIsLoading(true);
         setError(null);
-        const [booksRes, ticketsRes] = await Promise.all([
+        const [booksRes, ticketsRes, openRes, inProgressRes] = await Promise.all([
           client.getBooks({ page: 1, pageSize: 50 }),
           client.getTickets({ page: 1, pageSize: 25 }),
+          client.getTickets({ page: 1, pageSize: 1, status: "OPEN" }),
+          client.getTickets({ page: 1, pageSize: 1, status: "IN_PROGRESS" }),
         ]);
 
         if (isMounted) {
           setBooks(booksRes.items);
           setTickets(ticketsRes.items);
+          setTicketTotal(ticketsRes.total);
+          setActiveTotal(openRes.total + inProgressRes.total);
         }
       } catch (err: any) {
         if (isMounted) {
@@ -85,9 +92,9 @@ export const DashboardPage: React.FC = () => {
       totalRoyalty,
       royaltyPending,
       royaltyPaid,
-      activeTicketsCount: activeTickets.length,
+      activeTicketsCount: activeTotal ?? activeTickets.length,
     };
-  }, [books, tickets]);
+  }, [books, tickets, activeTotal]);
 
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -278,7 +285,7 @@ export const DashboardPage: React.FC = () => {
               to="/tickets"
               className="text-xs font-semibold text-brand-700 hover:text-brand-800 flex items-center gap-1"
             >
-              View All ({tickets.length})
+              View All ({ticketTotal ?? tickets.length})
               <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
