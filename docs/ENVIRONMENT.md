@@ -36,7 +36,7 @@ Production never falls back to fabricated output: without a key, or when the pro
 | Variable | Default | Notes |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | empty = AI disabled | Server-side only; wrapped in a redacting `Secret`, never logged or returned. |
-| `OPENROUTER_MODEL` / `OPENROUTER_FALLBACK_MODEL` | `openai/gpt-4o-mini` / none | |
+| `OPENROUTER_MODEL` / `OPENROUTER_FALLBACK_MODEL` | `google/gemma-4-31b-it:free` / none | |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | `https://` required, except `http://localhost` / `127.0.0.1` (used by the tests' mock provider and by the staging demo mock, which runs as a supervised process inside the API container so it can be reached on loopback). |
 | `AI_TIMEOUT_MS` / `AI_MAX_RETRIES` | `15000` / `2` | |
 | `AI_RETRY_BASE_DELAY_MS` / `AI_RETRY_MAX_DELAY_MS` | `500` / `4000` | |

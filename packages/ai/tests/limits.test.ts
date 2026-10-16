@@ -77,7 +77,7 @@ describe("model calls per analysis", () => {
   });
   it("HTTP calls never exceed 2 × (maxRetries + 1) × models, and a provider outage costs only the classification budget", async () => {
     const f = mockFetch(new Response("", { status: 503 }));
-    const provider = createOpenRouterProvider({ config: testConfig({ AI_MAX_RETRIES: "3", OPENROUTER_FALLBACK_MODEL: "a/b" }), fetch: asFetch(f), sleep: async () => undefined });
+    const provider = createOpenRouterProvider({ config: testConfig({ AI_MAX_RETRIES: "3", OPENROUTER_FALLBACK_MODEL: "a/b:free" }), fetch: asFetch(f), sleep: async () => undefined });
     await createAiService({ provider }).analyzeTicket({ ticketId: "t", subject: "x", description: "royalty", authorContext: {} });
     expect(f).toHaveBeenCalledTimes((3 + 1) * 2);
   });
@@ -94,7 +94,7 @@ describe("maximum execution time", () => {
     const c = loadAiConfig({ OPENROUTER_API_KEY: "sk-or-test-0000000000000000" });
     // 2 calls × 1 model × (3 attempts × 15,000 ms + 500 ms + 1,000 ms backoff)
     expect(worstCaseAnalysisMs(c)).toBe(93_000);
-    expect(worstCaseAnalysisMs({ ...c, fallbackModel: "a/b" })).toBe(186_000);
+    expect(worstCaseAnalysisMs({ ...c, fallbackModel: "a/b:free" })).toBe(186_000);
     expect(worstCaseAnalysisMs({ ...c, maxRetries: 0 })).toBe(30_000);
   });
   it("scales with configuration", () => {

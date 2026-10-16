@@ -121,8 +121,8 @@ describe("cost mapping", () => {
   });
   it("records a fallback model in the model column", async () => {
     const o = await run(goodClass, goodDraft);
-    const mixed = { ...o, meta: { ...o.meta, usage: [usageFixture, { ...usageFixture, model: "meta/fallback" }] } };
-    expect(decideAttempt(mixed).row.model).toBe("test/model,meta/fallback");
+    const mixed = { ...o, meta: { ...o.meta, usage: [usageFixture, { ...usageFixture, model: "meta/fallback:free" }] } };
+    expect(decideAttempt(mixed).row.model).toBe("test/model,meta/fallback:free");
   });
 });
 
@@ -211,7 +211,7 @@ describe("analyzeForPersistence", () => {
   it("bounds PENDING staleness from configuration", () => {
     const c = testConfig({ AI_TIMEOUT_MS: "1000", AI_MAX_RETRIES: "2", AI_RETRY_BASE_DELAY_MS: "100", AI_RETRY_MAX_DELAY_MS: "1000" });
     expect(worstCaseAnalysisMs(c)).toBe(2 * (3 * 1000 + 100 + 200));
-    expect(worstCaseAnalysisMs({ ...c, fallbackModel: "x/y" })).toBe(2 * worstCaseAnalysisMs(c));
+    expect(worstCaseAnalysisMs({ ...c, fallbackModel: "x/y:free" })).toBe(2 * worstCaseAnalysisMs(c));
   });
 });
 

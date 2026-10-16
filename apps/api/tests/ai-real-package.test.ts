@@ -116,7 +116,7 @@ describe.skipIf(!available)(`real @bookleaf/ai (${sourceRef}) through the backen
     const ticketId = await s.create();
     const [row] = await attempts(ticketId);
     expect(row).toMatchObject({ status: "COMPLETED", category: "ROYALTY_PAYMENTS", priority: "HIGH", citations: ["kb.royalty-policy"], inputTokens: 800, outputTokens: 100, costMicrounits: 180, errorCode: null });
-    expect(row!.model).toContain("openai/gpt-4o-mini");
+    expect(row!.model).toContain("google/gemma-4-31b-it:free");
     expect(row!.draftResponse).toMatch(/^Dear Synthetic|^Dear /);
     expect(row!.draftResponse).not.toContain("{{");
     expect(row!.promptVersion).toMatch(/classify-v1\/draft-v1$/);

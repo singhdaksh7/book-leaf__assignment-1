@@ -23,7 +23,7 @@ const mockFetch = (...steps: Array<Response | Error | (() => Promise<Response>)>
 describe("loadAiConfig", () => {
   it("applies defaults and keeps the key redacted when serialised or logged", () => {
     const c = loadAiConfig({ OPENROUTER_API_KEY: FAKE_KEY });
-    expect(c).toMatchObject({ model: "openai/gpt-4o-mini", maxRetries: 2, timeoutMs: 15000, baseUrl: "https://openrouter.ai/api/v1" });
+    expect(c).toMatchObject({ model: "google/gemma-4-31b-it:free", maxRetries: 2, timeoutMs: 15000, baseUrl: "https://openrouter.ai/api/v1" });
     expect(JSON.stringify(c)).not.toContain(FAKE_KEY);
     expect(String(c.apiKey)).toBe("[REDACTED]");
     expect(c.apiKey.reveal()).toBe(FAKE_KEY);
@@ -49,7 +49,7 @@ describe("OpenRouterProvider", () => {
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${FAKE_KEY}`);
     const body = JSON.parse(init.body as string);
-    expect(body).toMatchObject({ model: "openai/gpt-4o-mini", temperature: 0, max_tokens: 400, response_format: { type: "json_object" } });
+    expect(body).toMatchObject({ model: "google/gemma-4-31b-it:free", temperature: 0, max_tokens: 400, response_format: { type: "json_object" } });
     expect(res.content).toBe('{"a":1}');
     expect(res.usage).toMatchObject({ promptTokens: 400, completionTokens: 50, totalTokens: 450, costUsd: 0.00009, attempts: 1, fallbackUsed: false });
     expect(tracker.summary()).toMatchObject({ calls: 1, totalTokens: 450, costUsd: 0.00009 });
@@ -96,15 +96,15 @@ describe("OpenRouterProvider", () => {
 
   it("retries 5xx, then switches to the fallback model once and flags it in usage", async () => {
     const f = mockFetch(new Response("", { status: 502 }), jsonResponse(okEnvelope("{}")));
-    const res = await provider(f as unknown as typeof fetch, { AI_MAX_RETRIES: "0", OPENROUTER_FALLBACK_MODEL: "meta/fallback" }).complete(request);
-    expect(JSON.parse(((f.mock.calls[1] as unknown) as [string, RequestInit])[1].body as string).model).toBe("meta/fallback");
-    expect(res.usage).toMatchObject({ model: "meta/fallback", fallbackUsed: true, attempts: 2 });
+    const res = await provider(f as unknown as typeof fetch, { AI_MAX_RETRIES: "0", OPENROUTER_FALLBACK_MODEL: "meta/fallback:free" }).complete(request);
+    expect(JSON.parse(((f.mock.calls[1] as unknown) as [string, RequestInit])[1].body as string).model).toBe("meta/fallback:free");
+    expect(res.usage).toMatchObject({ model: "meta/fallback:free", fallbackUsed: true, attempts: 2 });
   });
 
   it.each([[400, "AI_PROVIDER_ERROR"], [402, "AI_PROVIDER_ERROR"], [401, "AI_NOT_CONFIGURED"], [403, "AI_NOT_CONFIGURED"]])(
     "does not retry or fall back on non-retryable %i (%s)", async (status, code) => {
       const f = mockFetch(new Response("", { status }));
-      await expect(provider(f as unknown as typeof fetch, { OPENROUTER_FALLBACK_MODEL: "meta/fallback" }).complete(request)).rejects.toMatchObject({ code });
+      await expect(provider(f as unknown as typeof fetch, { OPENROUTER_FALLBACK_MODEL: "meta/fallback:free" }).complete(request)).rejects.toMatchObject({ code });
       expect(f).toHaveBeenCalledTimes(1);
     });
 
@@ -158,5 +158,21 @@ describe("OpenRouterProvider", () => {
     const onUsage = vi.fn((_: UsageRecord) => undefined);
     await provider(mockFetch(new Response("", { status: 500 })) as unknown as typeof fetch, { AI_MAX_RETRIES: "0" }, { onUsage }).complete(request).catch(() => undefined);
     expect(onUsage).not.toHaveBeenCalled();
+  });
+});
+
+describe("zero-spend model guard", () => {
+  it.each([
+    [{ OPENROUTER_MODEL: "openai/gpt-4o-mini" }],
+    [{ OPENROUTER_FALLBACK_MODEL: "anthropic/claude-sonnet-4" }],
+    [{ OPENROUTER_MODEL: "openrouter/auto" }]
+  ])("rejects a non-free model against the real provider %j", (env) => {
+    expect(() => testConfig(env)).toThrow(/free/);
+  });
+  it("allows the default free model and a free fallback", () => {
+    expect(testConfig({ OPENROUTER_FALLBACK_MODEL: "nvidia/nemotron-3-super-120b-a12b:free" }).model).toBe("google/gemma-4-31b-it:free");
+  });
+  it("exempts loopback endpoints used by the opt-in demonstration mock", () => {
+    expect(testConfig({ OPENROUTER_BASE_URL: "http://127.0.0.1:8080/api/v1", OPENROUTER_MODEL: "demo/mock-not-a-real-model" }).model).toBe("demo/mock-not-a-real-model");
   });
 });

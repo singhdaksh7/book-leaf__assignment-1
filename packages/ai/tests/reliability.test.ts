@@ -22,7 +22,7 @@ describe("provider failure modes → attempt state, retry advice and call bounds
   const cases: Array<[string, () => ReturnType<typeof mockFetch>, Record<string, string>, { errorCode: string; retry: string; calls: number }]> = [
     ["rate limited (429) with 2 retries", () => mockFetch(T(429)), {}, { errorCode: "AI_RATE_LIMITED", retry: "later", calls: 3 }],
     ["rate limited with 0 retries", () => mockFetch(T(429)), { AI_MAX_RETRIES: "0" }, { errorCode: "AI_RATE_LIMITED", retry: "later", calls: 1 }],
-    ["rate limited, fallback model doubles the bound", () => mockFetch(T(429)), { OPENROUTER_FALLBACK_MODEL: "x/y" }, { errorCode: "AI_RATE_LIMITED", retry: "later", calls: 6 }],
+    ["rate limited, fallback model doubles the bound", () => mockFetch(T(429)), { OPENROUTER_FALLBACK_MODEL: "x/y:free" }, { errorCode: "AI_RATE_LIMITED", retry: "later", calls: 6 }],
     ["server error 500", () => mockFetch(T(500)), {}, { errorCode: "AI_PROVIDER_ERROR", retry: "later", calls: 3 }],
     ["gateway timeout 504", () => mockFetch(T(504)), { AI_MAX_RETRIES: "1" }, { errorCode: "AI_PROVIDER_ERROR", retry: "later", calls: 2 }],
     ["network failure", () => mockFetch(new TypeError("socket hang up")), {}, { errorCode: "AI_NETWORK_ERROR", retry: "later", calls: 3 }],

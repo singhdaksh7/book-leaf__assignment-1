@@ -25,6 +25,9 @@ export interface AiConfig {
   appUrl: string | undefined;
 }
 
+/** Verified zero-priced via https://openrouter.ai/api/v1/models (pricing.prompt = pricing.completion = 0, supports response_format). */
+export const DEFAULT_FREE_MODEL = "google/gemma-4-31b-it:free";
+
 const emptyToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 const optionalString = z.preprocess(emptyToUndefined, z.string().trim().min(1).optional());
 const intInRange = (def: number, min: number, max: number) =>
@@ -33,7 +36,7 @@ const intInRange = (def: number, min: number, max: number) =>
 const envSchema = z.object({
   OPENROUTER_API_KEY: z.string().trim().min(8),
   OPENROUTER_BASE_URL: z.preprocess(emptyToUndefined, z.string().url().default("https://openrouter.ai/api/v1")),
-  OPENROUTER_MODEL: z.preprocess(emptyToUndefined, z.string().trim().min(1).default("openai/gpt-4o-mini")),
+  OPENROUTER_MODEL: z.preprocess(emptyToUndefined, z.string().trim().min(1).default(DEFAULT_FREE_MODEL)),
   OPENROUTER_FALLBACK_MODEL: optionalString,
   OPENROUTER_APP_NAME: z.preprocess(emptyToUndefined, z.string().trim().min(1).default("BookLeaf Author Support Portal")),
   OPENROUTER_APP_URL: optionalString,
@@ -59,6 +62,14 @@ export function loadAiConfig(env: Record<string, string | undefined> = process.e
   const local = /^http:\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(baseUrl);
   if (!baseUrl.startsWith("https://") && !local) {
     throw new AiUnavailableError("AI configuration invalid or missing: OPENROUTER_BASE_URL", "AI_NOT_CONFIGURED");
+  }
+  // Zero-spend guard: against the real provider only ":free" model ids are accepted (primary and fallback).
+  // Loopback endpoints (the opt-in demonstration mock) are exempt because they make no billable calls.
+  if (!local) {
+    const bad = [e.OPENROUTER_MODEL, e.OPENROUTER_FALLBACK_MODEL].filter((m): m is string => !!m && !m.endsWith(":free"));
+    if (bad.length > 0) {
+      throw new AiUnavailableError("AI configuration invalid or missing: only zero-cost \":free\" OpenRouter models are allowed", "AI_NOT_CONFIGURED");
+    }
   }
   return {
     apiKey: new Secret(e.OPENROUTER_API_KEY), baseUrl, model: e.OPENROUTER_MODEL, fallbackModel: e.OPENROUTER_FALLBACK_MODEL,

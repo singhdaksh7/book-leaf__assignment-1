@@ -45,7 +45,7 @@ See `.env.example` (names only). Never expose these to `apps/web`; never commit 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `OPENROUTER_API_KEY` | none (required) | Missing/invalid → fallbacks with reason `AI_NOT_CONFIGURED`; no network call is made. |
-| `OPENROUTER_MODEL` | `openai/gpt-4o-mini` | Primary model (configurable; chosen for low cost). |
+| `OPENROUTER_MODEL` | `google/gemma-4-31b-it:free` | Primary model (configurable; chosen for low cost). |
 | `OPENROUTER_FALLBACK_MODEL` | unset | Tried once, only after retryable failures of the primary. |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | https required (http only for localhost). |
 | `OPENROUTER_APP_NAME`, `OPENROUTER_APP_URL` | name set, URL unset | Optional attribution headers. |

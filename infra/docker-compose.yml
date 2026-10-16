@@ -44,7 +44,7 @@ services:
       TRUST_PROXY: "1"
       ATTACHMENT_DIR: /data/attachments
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-openai/gpt-4o-mini}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemma-4-31b-it:free}
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
     volumes:
       - bookleaf_attachments:/data/attachments
