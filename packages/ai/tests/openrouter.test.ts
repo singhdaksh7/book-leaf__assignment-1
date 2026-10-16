@@ -23,7 +23,7 @@ const mockFetch = (...steps: Array<Response | Error | (() => Promise<Response>)>
 describe("loadAiConfig", () => {
   it("applies defaults and keeps the key redacted when serialised or logged", () => {
     const c = loadAiConfig({ OPENROUTER_API_KEY: FAKE_KEY });
-    expect(c).toMatchObject({ model: "google/gemma-4-31b-it:free", maxRetries: 2, timeoutMs: 15000, baseUrl: "https://openrouter.ai/api/v1" });
+    expect(c).toMatchObject({ model: "nvidia/nemotron-3-super-120b-a12b:free", maxRetries: 2, timeoutMs: 15000, baseUrl: "https://openrouter.ai/api/v1" });
     expect(JSON.stringify(c)).not.toContain(FAKE_KEY);
     expect(String(c.apiKey)).toBe("[REDACTED]");
     expect(c.apiKey.reveal()).toBe(FAKE_KEY);
@@ -49,7 +49,7 @@ describe("OpenRouterProvider", () => {
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${FAKE_KEY}`);
     const body = JSON.parse(init.body as string);
-    expect(body).toMatchObject({ model: "google/gemma-4-31b-it:free", temperature: 0, max_tokens: 400, response_format: { type: "json_object" } });
+    expect(body).toMatchObject({ model: "nvidia/nemotron-3-super-120b-a12b:free", temperature: 0, max_tokens: 400, response_format: { type: "json_object" } });
     expect(res.content).toBe('{"a":1}');
     expect(res.usage).toMatchObject({ promptTokens: 400, completionTokens: 50, totalTokens: 450, costUsd: 0.00009, attempts: 1, fallbackUsed: false });
     expect(tracker.summary()).toMatchObject({ calls: 1, totalTokens: 450, costUsd: 0.00009 });
@@ -170,7 +170,7 @@ describe("zero-spend model guard", () => {
     expect(() => testConfig(env)).toThrow(/free/);
   });
   it("allows the default free model and a free fallback", () => {
-    expect(testConfig({ OPENROUTER_FALLBACK_MODEL: "nvidia/nemotron-3-super-120b-a12b:free" }).model).toBe("google/gemma-4-31b-it:free");
+    expect(testConfig({ OPENROUTER_FALLBACK_MODEL: "google/gemma-4-31b-it:free" }).model).toBe("nvidia/nemotron-3-super-120b-a12b:free");
   });
   it("exempts loopback endpoints used by the opt-in demonstration mock", () => {
     expect(testConfig({ OPENROUTER_BASE_URL: "http://127.0.0.1:8080/api/v1", OPENROUTER_MODEL: "demo/mock-not-a-real-model" }).model).toBe("demo/mock-not-a-real-model");

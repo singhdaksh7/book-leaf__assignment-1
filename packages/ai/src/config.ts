@@ -26,7 +26,7 @@ export interface AiConfig {
 }
 
 /** Verified zero-priced via https://openrouter.ai/api/v1/models (pricing.prompt = pricing.completion = 0, supports response_format). */
-export const DEFAULT_FREE_MODEL = "google/gemma-4-31b-it:free";
+export const DEFAULT_FREE_MODEL = "nvidia/nemotron-3-super-120b-a12b:free";
 
 const emptyToUndefined = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 const optionalString = z.preprocess(emptyToUndefined, z.string().trim().min(1).optional());

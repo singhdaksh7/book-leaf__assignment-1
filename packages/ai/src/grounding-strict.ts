@@ -3,6 +3,11 @@ import { datesIn, type GroundingIssue } from "./grounding.js";
 const LINK = /\bhttps?:\/\/\S+|\bwww\.\S+|\b[\w.+-]+@[\w-]+\.[\w.-]+\b|\b\w+\.(?:com|in|org|net|io|co)\b/i;
 // BookLeaf policy offers a free reprint after verification. It offers no refunds, compensation, credits or guarantees.
 const COMMITMENT = /\b(?:refund|reimburs|compensat|waive|credit note|discount|cashback|voucher|money[- ]back|goodwill|complimentary|guarantee[ds]?|promise[ds]?)\w*|\bfree (?:copies|books|shipping|upgrade|marketing)\b/i;
+// A quoted menu/section/tab label ("the 'Author Profile' section", "go to 'Settings'") is a product claim. It must appear in the sources
+// or the ticket, otherwise the model invented a UI feature. "your dashboard" (unquoted) is unaffected.
+const UI_LABEL = /['‘"“]([A-Z][A-Za-z &-]{2,40})['’"”]\s+(?:section|tab|page|menu|button|option|screen|link)\b|\b(?:section|tab|page|menu|button|option|screen)\s+(?:called|named|labell?ed|titled)\s+['‘"“]?([A-Z][A-Za-z &-]{2,40})|\b(?:navigate to|go to|open|click|select|choose|visit)\s+(?:the\s+)?['‘"“]([A-Z][A-Za-z &-]{2,40})['’"”]/g;
+// The portal sends no e-mail, so a draft must not tell the author to reply to one.
+const REPLY_EMAIL = /\b(?:reply|respond) to this e-?mail\b/i;
 const PAYOUT_WORDS = /\b(?:payout|payment|royalt\w*|transfer\w*)/i;
 const CURRENCY = /[₹$]\s?\d|\b(?:rs\.?|inr)\s?\d/i;
 const PAYOUT_FUTURE = /\byou(?:'ll| will)\s+(?:receive|get|be paid)\b|\bwill\s+(?:be\s+)?(?:paid|credited|transferred|processed|released|disbursed|sent|arrive|reach)\b|\b(?:is|are)\s+(?:scheduled|due|on (?:its|the) way)\b/i;
@@ -29,6 +34,13 @@ export function strictIssues(output: string, corpus: string): GroundingIssue[] {
   if (link) issues.push({ kind: "unsupported-link", detail: link[0] });
   const commitment = COMMITMENT.exec(output);
   if (commitment) issues.push({ kind: "unsupported-commitment", detail: commitment[0] });
+  const corpusLower = corpus.toLowerCase();
+  for (const m of output.matchAll(UI_LABEL)) {
+    const label = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    if (label && !corpusLower.includes(label.toLowerCase())) issues.push({ kind: "unsupported-feature", detail: label });
+  }
+  const email = REPLY_EMAIL.exec(output);
+  if (email) issues.push({ kind: "unsupported-feature", detail: email[0] });
 
   const allowedDurations = durationKeys(corpus);
   for (const key of durationKeys(output)) {

@@ -57,9 +57,13 @@ const results = [];
 const tracker = new ai.UsageTracker();
 const service = ai.createAiServiceFromEnv(process.env, { usageTracker: tracker });
 
+const moneyIn = (t) => [...t.matchAll(/(?:₹|\bRs\.?|\bINR\b|\$|\bUSD\b)\s?(\d[\d,]*(?:\.\d+)?)/gi)].map((m) => m[1].replace(/,/g, ""));
+const kbMoney = moneyIn(ai.KB_CHUNKS.map((c) => c.content).join("\n"));
+
 let failed = false;
 for (const [expected, subject, description] of SCENARIOS.slice(0, limit)) {
   const started = Date.now();
+  const groundedMoney = [...kbMoney, ...moneyIn(`${subject} ${description}`)];
   try {
     const out = await service.analyzeTicketDetailed({ ticketId: `synthetic-${expected}`, subject, description, authorContext: { name: "Synthetic Author" } });
     const a = out.analysis, m = out.meta;
@@ -68,7 +72,8 @@ for (const [expected, subject, description] of SCENARIOS.slice(0, limit)) {
       realModelDraft: m.draftSource === "model",
       categoryMatches: a.category === expected,
       humanReviewRequired: a.requiresHumanReview === true,
-      noInventedMoney: !/(?:₹|\bRs\.?|\bINR\b|\$|\bUSD\b)\s?\d/i.test(a.draftResponse ?? "")
+      // Any currency amount must come from the knowledge base or the ticket (the royalty policy's Rs 1,000 minimum payout is legitimate).
+      noInventedMoney: moneyIn(a.draftResponse ?? "").every((amt) => groundedMoney.includes(amt))
     };
     const ok = Object.values(checks).every(Boolean);
     failed ||= !ok;

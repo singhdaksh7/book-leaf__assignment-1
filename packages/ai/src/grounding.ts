@@ -4,7 +4,7 @@ export interface GroundingSource { text: string; }
 export type GroundingIssueKind =
   | "ungrounded-number" | "ungrounded-date" | "completed-action"
   // strict (author-facing drafts) only:
-  | "payout-promise" | "unsupported-link" | "unsupported-commitment" | "unsupported-timeline" | "unsupported-markup";
+  | "payout-promise" | "unsupported-link" | "unsupported-commitment" | "unsupported-timeline" | "unsupported-markup" | "unsupported-feature";
 
 export interface GroundingOptions {
   /** Author-facing drafts: also reject payout promises, links/contact details and refund/compensation commitments. */
