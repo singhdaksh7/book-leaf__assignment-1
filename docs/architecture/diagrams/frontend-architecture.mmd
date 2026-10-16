@@ -1,0 +1,46 @@
+%% file: frontend-architecture.mmd
+flowchart TB
+    MAIN["main.tsx<br/>ReactDOM.createRoot, StrictMode"] --> APP["App<br/>BrowserRouter"]
+    APP --> AP["AuthProvider (context)<br/>user, isLoading, login, logout, refreshUser"]
+    AP --> ROUTES["AppRoutes<br/>React Router route table"]
+
+    ROUTES --> LOGIN["LoginPage<br/>public /login"]
+    ROUTES --> PR1["ProtectedRoute<br/>any signed-in user"]
+    PR1 --> LAYOUT["AppLayout<br/>Sidebar + Navbar + Outlet"]
+
+    subgraph AUTHOR["Author pages (requireAuthor on the API)"]
+        DASH["DashboardPage"]
+        BOOKS["BooksPage"]
+        BOOK["BookDetailPage"]
+        TICKS["TicketsPage"]
+        NEWT["NewTicketPage"]
+        TDET["TicketDetailPage"]
+    end
+
+    subgraph ADMINP["Admin pages (ProtectedRoute requiredRole=ADMIN)"]
+        ADASH["AdminDashboardPage"]
+        AQ["AdminQueuePage"]
+        ADET["AdminTicketDetailPage"]
+    end
+
+    LAYOUT --> AUTHOR
+    LAYOUT --> ADMINP
+    ROUTES --> NF["NotFoundPage<br/>path *"]
+
+    COMMON["components/common<br/>Alert, Badge, Button, Card, Input, Select, Skeleton, StatCard, EmptyState"]
+    AUTHOR --> COMMON
+    ADMINP --> COMMON
+
+    AP -- "client" --> CLIENT["ApiClient interface"]
+    CLIENT --> HTTP["HttpApiClient<br/>fetch + credentials: include<br/>Zod-validates every response"]
+    CLIENT -. "development builds only" .-> MOCK["MockApiClient<br/>in-memory fixtures"]
+    HTTP --> API["/api/v1 (same origin)"]
+
+    EVM["ticketEventManager<br/>EventSource + 25 s polling fallback"] --> SSE["GET /api/v1/events/tickets"]
+    TICKS -- "subscribe" --> EVM
+    TDET -- "subscribe + 25 s poll" --> EVM
+    AP -- "init on login, close on logout / 401" --> EVM
+
+    CT["@bookleaf/contracts<br/>Zod schemas and types"] -.-> HTTP
+    CT -.-> AUTHOR
+    CT -.-> ADMINP

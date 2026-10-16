@@ -1,0 +1,17 @@
+%% file: auth-logout-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant A as Express (authenticate, csrf)
+    participant L as POST /auth/logout
+    participant DB as PostgreSQL
+    participant H as TicketEventHub
+
+    B->>A: POST /api/v1/auth/logout (cookie + X-CSRF-Token + Origin)
+    A->>L: requireAuth passes
+    L->>DB: DELETE Session WHERE id = sessionId
+    L->>H: closeSession(sessionId), open streams bound to it are closed
+    L-->>B: 204 No Content, Set-Cookie clears bookleaf_session and XSRF-TOKEN
+    B->>A: replay of the old cookie
+    A->>DB: Session by tokenHash, not found
+    A-->>B: 401 UNAUTHENTICATED (audit: "logged-out cookie replay returns 401")

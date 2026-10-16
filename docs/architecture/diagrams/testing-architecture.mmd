@@ -1,0 +1,19 @@
+%% file: testing-architecture.mmd
+flowchart TB
+    subgraph L1["Layer 1 - fast, no network (every change)"]
+        AIU["packages/ai unit tests<br/>vitest, scripted provider doubles"]
+        WEBU["apps/web unit tests<br/>vitest + jsdom + Testing Library"]
+        SCAF["tests/scaffold.test.mjs<br/>contracts vs Prisma vs importer alignment"]
+        INFRA["infra/mock-ai/server.test.mjs<br/>demo mock behaviour (node:test)"]
+    end
+    subgraph L2["Layer 2 - integration with a real PostgreSQL"]
+        APIT["apps/api tests (vitest + supertest)<br/>embedded PostgreSQL, all 5 migrations applied<br/>real @bookleaf/ai package when BOOKLEAF_AI_ENTRY is set,<br/>OpenRouter replaced by a local mock HTTP server"]
+    end
+    subgraph L3["Layer 3 - browser end to end, disposable stack"]
+        E2E["apps/web/e2e (Playwright, 30 tests)<br/>embedded PostgreSQL + built API + built web<br/>+ mock OpenRouter that records every request"]
+    end
+    subgraph L4["Layer 4 - live staging checks (manual, against the real HTTPS URL)"]
+        LIVE["tests/live/*.mjs<br/>API matrix, security, AI workflow, UI journey,<br/>responsive sweep, real-time"]
+    end
+    AIU --> APIT --> E2E --> LIVE
+    WEBU --> E2E

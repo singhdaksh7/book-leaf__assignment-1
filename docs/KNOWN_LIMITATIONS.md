@@ -7,14 +7,14 @@
 - **Graceful SIGTERM shutdown** (`apps/api/src/server.ts`) is code-reviewed only.
 - **Live OpenRouter**: AI behaviour is verified against a local mock and the real `@bookleaf/ai` package only. No paid call was made. Real-model output quality, latency and cost are untested.
 - **Multi-instance deployment**: see below.
-- **Browsers**: Chromium only (Playwright). Other browsers and mobile layouts were not tested.
+- **Browsers**: Chromium and Microsoft Edge (Chromium) only. Responsive layouts were checked at 1920, 1366, 768, 390 and 360 px; Firefox and Safari were not tested.
 
 ## By design / accepted for this release
 
 - **Single API instance.** Login throttling, per-author rate limits, SSE streams and AI single-flight are in memory and reset on restart.
 - **Same-site deployment required.** The API does not serve the web app; deploy both under one site (for example a reverse proxy: `/` static web, `/api` API) so the `SameSite=Lax` cookie is first-party.
 - **Attachments on local disk** under random keys; back them up with the database. No antivirus scanning. Allowed types: PDF, PNG, JPEG, WebP, plain text; 5 MiB; 5 per ticket.
-- **`TicketMessage` is append-only by convention** (no edit/delete route), not by database trigger. `AuditLog` and `InternalNote` are trigger-protected.
+- **`TicketMessage` is append-only by convention** (no edit/delete route), not by database trigger. `AuditLog` is append-only at the database level (update, delete and mass delete are rejected). `InternalNote` and `TicketAssignment` reject `UPDATE` by trigger (assignments allow only the `SET NULL` of a removed assignee), but their triggers do not cover `DELETE`, so a direct SQL delete is not blocked; the API has no delete route for either.
 - **A missing `Origin` header is accepted** on mutating requests (non-browser clients); the CSRF token is still required.
 - **Author payloads contain `assigneeId`** (opaque staff id) because the ticket schema is shared.
 - **No e-mail delivery.** Admin replies appear in the portal (and live over SSE); the UI text mentioning e-mail dispatch is aspirational.

@@ -1,0 +1,8 @@
+%% file: dataflow-ai-boundary.mmd
+flowchart LR
+    T["Ticket data in PostgreSQL"] --> F["Context builder<br/>apps/api/src/ai/context.ts<br/>allow-list"]
+    F -->|"SENT: subject + description (digit runs masked),<br/>last two author-visible messages,<br/>public policy excerpts,<br/>non-financial book facts (title, status, genre,<br/>publication date, print partner, channels)"| P["@bookleaf/ai<br/>sanitise, ground, validate"]
+    P -->|"HTTPS, bearer key"| OR["OpenRouter (third party)"]
+    F -.->|"NEVER SENT: author name, e-mail, phone, city,<br/>ISBN, MRP, royalty or sales figures, payout dates,<br/>internal notes, passwords, session data"| X["blocked at the allow-list"]
+    OR --> P
+    P -->|"validated draft, stored as a FAILED or COMPLETED attempt"| T

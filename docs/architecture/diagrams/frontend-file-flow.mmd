@@ -1,0 +1,15 @@
+%% file: frontend-file-flow.mmd
+flowchart TB
+    subgraph UP["Upload (author, NewTicketPage after ticket creation)"]
+        F1["User selects file"] --> F2["validateAttachmentFile<br/>non-empty, at most 5 MB, type PDF PNG JPEG WebP or text"]
+        F2 -- "invalid" --> FE["inline error, nothing sent"]
+        F2 -- "valid" --> F3["getAttachmentContentType<br/>declared type or file extension"]
+        F3 --> F4["file.arrayBuffer()"]
+        F4 --> F5["POST /author/tickets/:id/attachments?filename=...<br/>Content-Type = file type, raw bytes, X-CSRF-Token"]
+        F5 --> F6["Zod-validated attachment metadata (no storage key)"]
+    end
+    subgraph DL["Download (author or admin)"]
+        D1["Click download"] --> D2["GET .../attachments/:attachmentId with cookie"]
+        D2 --> D3["blob() + extractSafeFileName(Content-Disposition)"]
+        D3 --> D4["temporary object URL, anchor with download attribute, click, revoke"]
+    end

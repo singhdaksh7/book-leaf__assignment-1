@@ -1,0 +1,25 @@
+%% file: ticket-lifecycle.mmd
+stateDiagram-v2
+    [*] --> OPEN : author creates ticket (POST /author/tickets)
+    OPEN --> IN_PROGRESS : admin PATCH status
+    OPEN --> RESOLVED : admin PATCH status
+    OPEN --> CLOSED : admin PATCH status
+    IN_PROGRESS --> OPEN : admin PATCH status
+    IN_PROGRESS --> RESOLVED : admin PATCH status
+    IN_PROGRESS --> CLOSED : admin PATCH status
+    RESOLVED --> OPEN : admin reopens
+    RESOLVED --> IN_PROGRESS : admin PATCH status
+    RESOLVED --> CLOSED : admin PATCH status
+    CLOSED --> [*] : terminal, every write returns 409
+
+    note right of OPEN
+        Author reply, admin reply, internal note,
+        assignment, category and priority edits
+        do not change status
+    end note
+    note right of CLOSED
+        409 CONFLICT for: status, category and priority changes,
+        author and admin replies, attachments,
+        assignment changes, AI analysis.
+        Internal notes are still accepted (no status check in the route).
+    end note

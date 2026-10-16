@@ -1,0 +1,68 @@
+@startuml use-case
+!pragma layout smetana
+left to right direction
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam actorStyle awesome
+title BookLeaf Author Support Portal - Use cases (derived from implemented routes and pages)
+
+actor "Author" as AU
+actor "Administrator" as AD
+actor "LLM provider\n(OpenRouter in production,\ndemo mock on staging)" as LLM <<external system>>
+
+rectangle "BookLeaf Author Support Portal" {
+  usecase "Sign in / sign out" as UC1
+  usecase "Browse own books\nand book details" as UC2
+  usecase "Create support ticket\n(general or about a book)" as UC3
+  usecase "Attach file to ticket" as UC4
+  usecase "List and filter own tickets" as UC5
+  usecase "Read replies and status" as UC6
+  usecase "Reply to ticket" as UC7
+  usecase "Download attachment" as UC8
+  usecase "Receive live updates (SSE)" as UC9
+
+  usecase "Work the ticket queue\n(filter, sort by urgency)" as UC10
+  usecase "Open ticket workbench" as UC11
+  usecase "Set status, category,\npriority" as UC12
+  usecase "Assign ticket to self" as UC13
+  usecase "Reply to author" as UC14
+  usecase "Add internal note" as UC15
+  usecase "Request / re-run\nAI analysis" as UC16
+  usecase "Review AI draft\nand edit it" as UC17
+  usecase "View audit events" as UC18
+
+  usecase "Analyse ticket in background\n(classify + draft)" as UC19
+}
+
+AU --> UC1
+AU --> UC2
+AU --> UC3
+AU --> UC5
+AU --> UC6
+AU --> UC7
+AU --> UC8
+AU --> UC9
+UC4 .> UC3 : <<extend>>
+UC3 .> UC19 : <<include>>
+
+AD --> UC1
+AD --> UC10
+AD --> UC11
+AD --> UC12
+AD --> UC13
+AD --> UC14
+AD --> UC15
+AD --> UC16
+AD --> UC17
+AD --> UC18
+AD --> UC8
+UC17 .> UC14 : <<extend>>
+UC16 .> UC19 : <<include>>
+UC19 --> LLM
+
+note right of UC17
+  The draft is only data.
+  Nothing reaches the author until the
+  administrator sends a reply (UC14).
+end note
+@enduml

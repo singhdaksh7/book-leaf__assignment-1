@@ -1,0 +1,39 @@
+%% file: deployment-architecture.mmd
+flowchart TB
+    subgraph NET["Internet"]
+        BR["Browsers<br/>HTTPS 443, HTTP 80 redirects"]
+        LE["Let's Encrypt<br/>HTTP-01 challenge"]
+    end
+
+    subgraph VPS["VPS 77.37.45.177 - Ubuntu 24.04, 1 vCPU, 3.9 GiB RAM, 2 GiB swap, 48 GB disk"]
+        UFW["ufw: only 22, 80, 443 allowed in"]
+        TR["Traefik (shared, pre-existing, network_mode host)<br/>docker provider, certresolver letsencrypt<br/>NOT managed by this repository"]
+        OTHER["Other tenants (not BookLeaf)<br/>Daxul, KP-CRM, Printout, Vastraa"]
+
+        subgraph PROJ["Compose project bookleaf  (/opt/bookleaf/src/infra)"]
+            subgraph EDGE["network bookleaf_edge"]
+                WEB["web<br/>nginx-unprivileged :8080<br/>mem 64 MiB"]
+                API["api  :3000<br/>Node 22 + Express<br/>mem 512 MiB<br/>[demo override: supervised mock on 127.0.0.1:8080]"]
+            end
+            subgraph INT["network bookleaf_internal (internal: true)"]
+                DB[("db<br/>postgres:16-alpine, UTF8<br/>mem 512 MiB")]
+            end
+            VPG[("volume bookleaf_bookleaf_pgdata")]
+            VAT[("volume bookleaf_bookleaf_attachments<br/>/data/attachments")]
+            ENV[".env (mode 600)<br/>secrets, never in git"]
+            BK["backups/ (mode 700)<br/>pg_dump + attachments tar<br/>manual, no schedule"]
+        end
+    end
+
+    BR -- "443 TLS" --> TR
+    LE -. "80 /.well-known" .-> TR
+    TR -- "Host rule" --> WEB
+    TR -- "Host + /api/* or /healthz  priority 100" --> API
+    API -- "SQL" --> DB
+    DB --- VPG
+    API --- VAT
+    ENV -. "compose interpolation" .-> API
+    BK -. "scripts/backup.sh" .-> DB
+    BK -. "scripts/backup.sh" .-> VAT
+    UFW --- TR
+    OTHER --- TR

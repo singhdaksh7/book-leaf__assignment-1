@@ -1,0 +1,18 @@
+%% file: ai-attempt-state.mmd
+stateDiagram-v2
+    [*] --> PENDING : enqueue (ticket creation, admin refresh, or automatic retry)
+    PENDING --> COMPLETED : model classification or model draft passed validation
+    PENDING --> FAILED : no usable model output, or provider error, or invalid stored result
+    PENDING --> FAILED : abandoned (older than worst-case window + 30 s), AI_ATTEMPT_ABANDONED
+    FAILED --> PENDING : automatic retry (recovery sweep every 60 s, at most 2 per ticket, at least 60 s after the failure, retryable codes only)
+    FAILED --> PENDING : admin presses Re-run (after the 30 s cooldown)
+    COMPLETED --> PENDING : admin presses Re-run
+    FAILED --> [*] : retries exhausted or non-retryable, admin works manually
+    COMPLETED --> [*]
+
+    note right of FAILED
+        Retryable automatically: AI_TIMEOUT, AI_RATE_LIMITED, AI_PROVIDER_ERROR,
+        AI_NETWORK_ERROR, AI_ATTEMPT_ABANDONED.
+        Not retried automatically: AI_NOT_CONFIGURED, AI_INVALID_OUTPUT,
+        AI_UNGROUNDED_OUTPUT, AI_INTERNAL_ERROR, AI_RESULT_INVALID.
+    end note

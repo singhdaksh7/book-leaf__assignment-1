@@ -1,0 +1,33 @@
+%% file: ai-workflow.mmd
+flowchart TB
+    START["Author creates ticket<br/>or admin presses 'Re-run AI'"] --> ENQ["enqueue inside the ticket transaction<br/>(lock ticket row FOR UPDATE)"]
+    ENQ --> SF{"latest attempt state?"}
+    SF -- "PENDING and not abandoned" --> JOIN["return it unchanged (single-flight)"]
+    SF -- "PENDING but older than the worst-case window" --> AB["close as FAILED AI_ATTEMPT_ABANDONED"] --> NEW
+    SF -- "terminal and younger than 30 s (admin refresh only)" --> JOIN
+    SF -- "otherwise" --> NEW["INSERT AiAnalysis status PENDING<br/>(partial unique index: one PENDING per ticket)"]
+    NEW --> COMMIT["COMMIT, then kick(attemptId)<br/>background slot, max 2 concurrent runs"]
+    COMMIT --> IN["Build input<br/>ticket subject and description, author first name for greeting only,<br/>minimised book facts, last 2 AUTHOR-visible messages"]
+    IN --> SAN["Sanitise untrusted text: strip invisible chars, defuse angle brackets,<br/>redact e-mails and long numbers, truncate, wrap in random untrusted boundary"]
+    SAN --> DET["detectInjection: security flags (signal only)"]
+    DET --> RET["Keyword retrieval of policy chunks (max 3, 2 400 chars)"]
+    RET --> CL["Provider call 1: classify<br/>temperature 0, JSON object"]
+    CL --> CLV{"valid JSON, known category and priority,<br/>citations only from offered chunks,<br/>rationale grounded?"}
+    CLV -- "provider failed" --> HEU["heuristic keyword classification<br/>confidence at most 0.3, skip draft call"]
+    CLV -- "invalid or ungrounded" --> HEU2["heuristic classification (billed tokens kept)"]
+    CLV -- "yes" --> FLOOR["apply policy priority floor (only raises)<br/>cap confidence at 0.6 if injection flagged"]
+    HEU --> DR
+    HEU2 --> DR
+    FLOOR --> DR["Provider call 2: draft<br/>temperature 0.2, JSON object"]
+    DR --> DRV{"valid JSON, citations offered,<br/>numbers and dates grounded,<br/>no completed-action claims, links, commitments,<br/>unsupported timelines, payout promises?"}
+    DRV -- "no or provider down" --> FB["deterministic policy-only draft<br/>confidence capped at 0.5"]
+    DRV -- "yes" --> OKD["model draft, greeting name substituted locally"]
+    FB --> DEC
+    OKD --> DEC{"decideAttempt"}
+    DEC -- "model classification or model draft used" --> COMP["COMPLETED (MODEL or PARTIAL_FALLBACK)"]
+    DEC -- "neither used" --> FAIL["FAILED with errorCode"]
+    COMP --> SAN2["sanitiseRow: re-validate against the shared contract schema,<br/>invalid becomes FAILED AI_RESULT_INVALID"]
+    FAIL --> SAN2
+    SAN2 --> WR["UPDATE ... WHERE id AND status = PENDING<br/>(only one writer wins), DB state check enforces consistency"]
+    WR --> EVT["publish ticket.analysis.updated (admin audience only)"]
+    EVT --> REV["Admin reviews on the ticket workbench"]

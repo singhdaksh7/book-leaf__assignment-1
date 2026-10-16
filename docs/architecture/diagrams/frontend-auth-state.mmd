@@ -1,0 +1,10 @@
+%% file: frontend-auth-state.mmd
+stateDiagram-v2
+    [*] --> Loading : AuthProvider mounts, refreshUser() calls GET /auth/me
+    Loading --> Authenticated : 200 user
+    Loading --> Anonymous : 401 or any error (SSE manager closed)
+    Anonymous --> Authenticating : login(credentials)
+    Authenticating --> Authenticated : 200 user, ticketEventManager.init()
+    Authenticating --> Anonymous : error message shown (401, 403, 429, network)
+    Authenticated --> Anonymous : logout() always clears local state, even if the request fails
+    Authenticated --> Anonymous : any API call returns 401, onSessionExpired closes SSE

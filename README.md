@@ -57,7 +57,7 @@ API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESS
 - Attachments are stored on local disk under random keys outside any served path; they must be backed up with the database. Antivirus scanning is not implemented.
 - AI data minimisation: the provider receives only the ticket subject/description, the last two author-visible messages, public policy excerpts and non-financial book facts (title, status, genre, publication date, print partner, channels). Author name/email/phone/city, ISBN, MRP, royalty amounts and balances, copies sold and payout dates are never sent (allowlist in `apps/api/src/ai/context.ts`, repeated in `packages/ai`). Royalty drafts say the team will verify the figures internally; any amount a draft invents is rejected by the grounding check.
 - A missing `Origin` header is accepted on mutating requests (non-browser clients); the CSRF token is still required.
-- `TicketMessage` rows are append-only by convention (no edit route) but not DB-trigger protected; `AuditLog` and `InternalNote` are.
+- `TicketMessage` rows are append-only by convention (no edit route) but not DB-trigger protected; `AuditLog` is append-only at the database level (update, delete and mass delete are rejected). `InternalNote` and `TicketAssignment` reject `UPDATE` by trigger (assignments allow only the `SET NULL` of a removed assignee), but their triggers do not cover `DELETE`, so a direct SQL delete is not blocked; the API has no delete route for either.
 - Verified on Windows (Node 24.6, Chromium) and on Linux (Node 22 in Docker), and deployed as a staging stack behind Traefik with a Let's Encrypt certificate ([Deployment](infra/DEPLOY.md)). The live OpenRouter API was not exercised (no paid calls); staging runs without AI; see [Known limitations](docs/KNOWN_LIMITATIONS.md) and the [Security review](docs/SECURITY_REVIEW.md) (3 high `npm audit` advisories in the Prisma CLI chain, not reachable at runtime).
 
 ## Confidential source data
@@ -69,4 +69,5 @@ The original assignment PDF and JSON stay unchanged under ignored `reference/`; 
 - [Architecture](docs/ARCHITECTURE.md) · [API contract](docs/API_CONTRACT.md) · [Database schema](docs/DATABASE_SCHEMA.md) · [AI design](docs/AI_DESIGN.md)
 - [Environment guide](docs/ENVIRONMENT.md) · [Testing](docs/TESTING.md) · [Demo instructions](docs/DEMO.md)
 - [Security review](docs/SECURITY_REVIEW.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Submission checklist](docs/SUBMISSION_CHECKLIST.md)
+- [QA reports](docs/qa/FINAL_RELEASE_CHECKLIST.md) (feature matrix, E2E, security, AI, VPS, bug register) · [Architecture](docs/architecture/README.md) · [Live test scripts](tests/live/README.md)
 - [Docker deployment runbook](infra/DEPLOY.md) (production stack, backups, rollback, opt-in demo AI) · [Integration report](docs/INTEGRATION_REPORT.md)

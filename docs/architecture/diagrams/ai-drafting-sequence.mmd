@@ -1,0 +1,30 @@
+%% file: ai-drafting-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant SV as BookLeafAiService
+    participant D as Drafter
+    participant K as Keyword retriever
+    participant P as OpenRouterProvider
+    participant M as Model provider
+    participant G as Grounding checks
+
+    SV->>D: draft(input, classification, skipModel = fallbackReason if provider is down)
+    alt provider already failed in the classify step
+        D-->>SV: deterministic policy-only draft (no second call)
+    else
+        D->>K: retrieve policy chunks for the category (max 2 / 1 800 chars) and one style example
+        D->>D: prompt = classification label, policy excerpts, tone guidelines, example, untrusted ticket blocks, book facts (no financial data, no ISBN)
+        D->>P: complete(purpose draft, temperature 0.2, max 500 tokens)
+        P->>M: POST /chat/completions
+        M-->>P: {draft, citations}
+        P-->>D: completion
+        D->>D: parse JSON, citations must be offered policy ids
+        D->>G: findUnsupportedClaims(strict): numbers, dates, completed-action claims, links, refunds or compensation, unsupported time frames, payout promises, markup
+        alt any issue
+            D-->>SV: deterministic policy-only draft, reason AI_UNGROUNDED_OUTPUT, tokens still recorded
+        else clean
+            D->>D: replace the greeting placeholder with the author's first name locally
+            D-->>SV: model draft with at least one citation
+        end
+    end
+    SV->>SV: merge, confidence capped at 0.5 if the draft fell back, parse with aiAnalysisSchema (requiresHumanReview = true)

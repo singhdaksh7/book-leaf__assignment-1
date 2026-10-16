@@ -1,0 +1,10 @@
+%% file: dataflow-admin-reply.mmd
+flowchart LR
+    AD["Admin browser"] -->|"POST /admin/tickets/:id/replies"| API["API"]
+    AD -->|"POST /admin/tickets/:id/internal-notes"| API
+    API -->|"TicketMessage (visibility AUTHOR)<br/>+ AuditLog"| DB[("PostgreSQL")]
+    API -->|"InternalNote (admin only)<br/>+ AuditLog"| DB
+    API -.->|"SSE: reply event to the ticket owner<br/>and to staff"| AU["Author browser"]
+    AU -->|"GET /author/tickets/:id"| API
+    DB -->|"messages + attachments only<br/>NEVER internal notes, AI analysis, audit log"| API
+    API --> AU

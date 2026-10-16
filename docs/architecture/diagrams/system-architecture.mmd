@@ -1,0 +1,57 @@
+%% file: system-architecture.mmd
+flowchart TB
+    subgraph TB0["TRUST BOUNDARY 0 - Untrusted: Internet and user devices"]
+        AB["Author browser<br/>React SPA, cookies"]
+        DBR["Admin browser<br/>React SPA, cookies"]
+    end
+
+    subgraph TB2["TRUST BOUNDARY 2 - Third party"]
+        OR["OpenRouter API<br/>https://openrouter.ai/api/v1<br/>production path"]
+    end
+
+    subgraph HOST["TRUST BOUNDARY 1 - VPS host, Docker Engine (operator controlled)"]
+        TR["Traefik reverse proxy<br/>pre-existing on host, not in this repo<br/>:443 TLS termination, Let's Encrypt, HSTS header"]
+
+        subgraph INT["network bookleaf_internal (no internet route)"]
+            PG[("PostgreSQL 16<br/>db container")]
+        end
+
+        subgraph EDGE["Docker network bookleaf_edge"]
+            WEB["web container<br/>nginx-unprivileged :8080<br/>static SPA bundle + CSP headers"]
+            subgraph APIC["api container :3000 - Node 22, Express 4"]
+                MW["Middleware pipeline<br/>request id, access log, helmet, CORS,<br/>JSON 100 kB, cookies, authenticate, CSRF"]
+                RT["Routers<br/>auth, author, admin, events"]
+                SVC["Domain logic<br/>ticket transitions, filters, serializers,<br/>attachment validation, rate limiters"]
+                HUB["TicketEventHub<br/>in-memory SSE fan-out"]
+                AIS["AiAttemptService<br/>PENDING attempts, single-flight,<br/>retry sweep, concurrency 2"]
+                AIP["@bookleaf/ai<br/>classifier, drafter, sanitiser,<br/>grounding checks, OpenRouter client"]
+                PRI["Prisma Client<br/>@bookleaf/db"]
+                FS["LocalDiskStorage<br/>opaque 48-hex keys"]
+                MOCK["demo mock (docker-compose.demo.yml only)<br/>supervised background process in this container<br/>listens 127.0.0.1:8080, NOT real AI"]
+            end
+        end
+
+
+        VPG[("volume bookleaf_pgdata")]
+        VAT[("volume bookleaf_attachments")]
+    end
+
+
+    AB -- "HTTPS 443" --> TR
+    DBR -- "HTTPS 443" --> TR
+    TR -- "Host rule, static assets (http)" --> WEB
+    TR -- "/api/* and /healthz (http :3000)" --> MW
+    MW --> RT
+    RT --> SVC
+    RT --> HUB
+    RT --> AIS
+    AIS --> AIP
+    SVC --> PRI
+    AIS --> PRI
+    RT --> FS
+    PRI -- "SQL, postgresql://db:5432" --> PG
+    PG --- VPG
+    FS --- VAT
+    AIP -- "HTTPS, minimised prompt, bearer key" --> OR
+    AIP -. "demo only: http loopback" .-> MOCK
+    HUB -. "text/event-stream" .-> TR

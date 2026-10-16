@@ -1,0 +1,13 @@
+%% file: dataflow-ticket-creation.mmd
+flowchart LR
+    A["Author browser<br/>React SPA"] -->|"1. POST /api/v1/author/tickets<br/>JSON, cookie + X-CSRF-Token"| API["API"]
+    API -->|"2. validate (Zod), rate limit 30/h,<br/>ownership of bookId"| API
+    API -->|"3. one transaction: Ticket + PENDING AiAnalysis + AuditLog"| DB[("PostgreSQL")]
+    API -->|"4. 201 {ticket}"| A
+    A -->|"5. POST .../attachments?filename=...<br/>raw bytes, content-type allow-list"| API
+    API -->|"6. size 5 MiB, 5 per ticket,<br/>magic-byte check, safe display name"| API
+    API -->|"7. random 48-hex key, mode 0600"| FS[("attachments volume")]
+    API -->|"8. metadata row: name, type, size, sha256, key"| DB
+    API -.->|"9. after commit: SSE event<br/>{ticketId, occurredAt, version} only"| HUB["Event hub"]
+    HUB -.-> A
+    API -.->|"10. after commit: AI attempt<br/>minimised prompt, see 12.3"| AI["AI provider path"]

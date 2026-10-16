@@ -1,0 +1,23 @@
+%% file: auth-csrf-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser SPA
+    participant C as csrfProtection middleware
+    participant H as Route handler
+
+    B->>B: read XSRF-TOKEN cookie (JavaScript-readable)
+    B->>C: POST /api/v1/author/tickets with session cookie, Origin, X-CSRF-Token
+    C->>C: method is safe (GET, HEAD, OPTIONS) or request anonymous?
+    alt safe or anonymous
+        C->>H: pass through (anonymous requests are rejected later by requireAuth with 401)
+    else mutating and authenticated
+        C->>C: Origin header present? must equal WEB_ORIGIN, else 403 "Request origin is not allowed"
+        C->>C: no Origin but Sec-Fetch-Site is cross-site? 403
+        C->>C: expected = HMAC-SHA256(SESSION_SECRET, "csrf:" + sessionId)
+        C->>C: constant-time compare with X-CSRF-Token header
+        alt mismatch or missing
+            C-->>B: 403 FORBIDDEN "Missing or invalid CSRF token"
+        else match
+            C->>H: next()
+        end
+    end

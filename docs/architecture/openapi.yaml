@@ -1,0 +1,870 @@
+openapi: 3.1.0
+info:
+  title: BookLeaf Author Support and Communication Portal API
+  version: 0.1.0
+  summary: Hand-written description of the routes in apps/api/src, grounded in the Zod contracts in packages/contracts.
+  description: |
+    Derived from route handlers (apps/api/src/auth/routes.ts, routes/author.ts, routes/admin.ts, routes/events.ts, app.ts) and
+    packages/contracts/src/index.ts at git revision 3b09980 (working tree with uncommitted infra changes that do not touch the API).
+    Authentication is a server-side session cookie. Every non-GET request that carries a session also needs the X-CSRF-Token header
+    and a trusted Origin. Items that cannot be verified from source are marked with x-unverified.
+  license:
+    name: Not specified in the repository
+    identifier: NOASSERTION
+servers:
+  - url: https://bookleaf.77.37.45.177.sslip.io
+    description: Staging (synthetic data). Paths below include the /api/v1 prefix except /healthz.
+  - url: http://localhost:3000
+    description: Local development API (apps/api default PORT 3000)
+tags:
+  - name: Health
+  - name: Authentication
+  - name: Books
+  - name: Author tickets
+  - name: Messages
+  - name: Attachments
+  - name: Admin tickets
+  - name: Admin operations
+  - name: AI
+  - name: Events
+paths:
+  /healthz:
+    get:
+      tags: [Health]
+      operationId: healthz
+      summary: Liveness probe (does not check the database)
+      security: []
+      responses:
+        "200":
+          description: Process is up
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: ok }
+  /api/v1/auth/login:
+    post:
+      tags: [Authentication]
+      operationId: login
+      summary: Create a session
+      description: Origin must equal the configured WEB_ORIGIN (login CSRF defence). Failed attempts are throttled per IP and per IP+account.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in. Sets cookies bookleaf_session (HttpOnly) and XSRF-TOKEN.
+          headers:
+            Set-Cookie:
+              description: Two Set-Cookie headers (session token, CSRF token), Secure in production, SameSite=Lax, Path=/.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/auth/logout:
+    post:
+      tags: [Authentication]
+      operationId: logout
+      summary: Revoke the current session
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      responses:
+        "204": { description: "Session deleted, event streams closed, cookies cleared" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/auth/me:
+    get:
+      tags: [Authentication]
+      operationId: me
+      summary: Current user (also re-issues the CSRF cookie)
+      security: [{ cookieAuth: [] }]
+      responses:
+        "200":
+          description: Signed-in user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+  /api/v1/author/books:
+    get:
+      tags: [Books]
+      operationId: authorListBooks
+      summary: The caller's own books
+      description: Role AUTHOR with an author profile. Only page and pageSize are accepted; other query keys give 400.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PageSize" }
+      responses:
+        "200":
+          description: Page of books
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BookListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/author/books/{bookId}:
+    get:
+      tags: [Books]
+      operationId: authorGetBook
+      summary: One of the caller's own books (bare object, not wrapped)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/BookId" }
+      responses:
+        "200":
+          description: The book
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/author/tickets:
+    post:
+      tags: [Author tickets]
+      operationId: authorCreateTicket
+      summary: Create a ticket (also creates a PENDING AI attempt in the same transaction)
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateTicketRequest" }
+      responses:
+        "201":
+          description: Ticket created with status OPEN
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    get:
+      tags: [Author tickets]
+      operationId: authorListTickets
+      summary: The caller's own tickets, newest first
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Status" }
+        - { $ref: "#/components/parameters/Category" }
+        - { $ref: "#/components/parameters/Priority" }
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PageSize" }
+      responses:
+        "200":
+          description: Page of ticket summaries
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/author/tickets/{ticketId}:
+    get:
+      tags: [Author tickets]
+      operationId: authorGetTicket
+      summary: One of the caller's tickets with AUTHOR-visible messages only
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      responses:
+        "200":
+          description: Ticket and conversation
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketDetailResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/author/tickets/{ticketId}/messages:
+    post:
+      tags: [Messages]
+      operationId: authorReply
+      summary: Author reply (always AUTHOR-visible; identical body within 60 s returns the original)
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReplyRequest" }
+      responses:
+        "201":
+          description: Message stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/author/tickets/{ticketId}/attachments:
+    post:
+      tags: [Attachments]
+      operationId: authorUploadAttachment
+      summary: Upload one attachment as a raw body
+      description: |
+        Content-Type is the declared file type and must be one of the five allowed types; ?filename= is the display name.
+        The server verifies magic bytes against the declared type. Default limits 5 MiB per file and 5 files per ticket.
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+        - name: filename
+          in: query
+          required: true
+          schema: { type: string, minLength: 1 }
+      requestBody:
+        required: true
+        content:
+          application/pdf: { schema: { type: string, format: binary } }
+          image/png: { schema: { type: string, format: binary } }
+          image/jpeg: { schema: { type: string, format: binary } }
+          image/webp: { schema: { type: string, format: binary } }
+          text/plain: { schema: { type: string, format: binary } }
+      responses:
+        "201":
+          description: Attachment stored (storage key is never returned)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttachmentResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+    get:
+      tags: [Attachments]
+      operationId: authorListAttachments
+      summary: Attachment metadata for the caller's ticket
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      responses:
+        "200":
+          description: Attachment list
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttachmentListResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/author/tickets/{ticketId}/attachments/{attachmentId}:
+    get:
+      tags: [Attachments]
+      operationId: authorDownloadAttachment
+      summary: Download an attachment of the caller's ticket (always as a download)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+        - { $ref: "#/components/parameters/AttachmentId" }
+      responses:
+        "200": { $ref: "#/components/responses/AttachmentBytes" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/tickets:
+    get:
+      tags: [Admin tickets]
+      operationId: adminQueue
+      summary: Admin queue (unresolved first, most urgent first, then oldest first)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/Status" }
+        - { $ref: "#/components/parameters/Category" }
+        - { $ref: "#/components/parameters/Priority" }
+        - { $ref: "#/components/parameters/From" }
+        - { $ref: "#/components/parameters/To" }
+        - { $ref: "#/components/parameters/Page" }
+        - { $ref: "#/components/parameters/PageSize" }
+      responses:
+        "200":
+          description: Page of ticket summaries across all authors
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketListResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /api/v1/admin/tickets/{ticketId}:
+    get:
+      tags: [Admin tickets]
+      operationId: adminGetTicket
+      summary: Full ticket workbench payload
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      responses:
+        "200":
+          description: Ticket, author, book, messages, internal notes, assignments, latest AI attempt, last 100 audit events
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdminTicketDetailResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      tags: [Admin tickets]
+      operationId: adminUpdateTicket
+      summary: Change status, category and/or priority (CLOSED is terminal)
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateTicketRequest" }
+      responses:
+        "200":
+          description: Updated (or unchanged) ticket
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TicketResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/admin/tickets/{ticketId}/replies:
+    post:
+      tags: [Messages]
+      operationId: adminReply
+      summary: Send an author-visible reply (the only way a draft can reach an author)
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReplyRequest" }
+      responses:
+        "201":
+          description: Message stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MessageResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/admin/tickets/{ticketId}/internal-notes:
+    post:
+      tags: [Admin operations]
+      operationId: adminAddInternalNote
+      summary: Add an immutable admin-only note
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReplyRequest" }
+      responses:
+        "201":
+          description: Note stored
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/InternalNoteResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/tickets/{ticketId}/assignment:
+    put:
+      tags: [Admin operations]
+      operationId: adminAssign
+      summary: Assign the ticket to yourself, or unassign (null)
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AssignTicketRequest" }
+      responses:
+        "200":
+          description: Ticket and latest assignment history row
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AssignmentResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/admin/tickets/{ticketId}/ai-analysis:
+    get:
+      tags: [AI]
+      operationId: adminGetAiAnalysis
+      summary: Latest AI attempt for the ticket (or null)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      responses:
+        "200":
+          description: Latest attempt
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [analysis]
+                properties:
+                  analysis:
+                    oneOf:
+                      - { $ref: "#/components/schemas/AiAttempt" }
+                      - { type: "null" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      tags: [AI]
+      operationId: adminRequestAiAnalysis
+      summary: Start or join an analysis. Never sends anything and never changes the ticket.
+      security: [{ cookieAuth: [], csrfToken: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      responses:
+        "200":
+          description: The returned attempt is already terminal (for example inside the 30 s cooldown)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiAttemptResponse" }
+        "202":
+          description: The returned attempt is PENDING
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AiAttemptResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
+  /api/v1/admin/tickets/{ticketId}/attachments:
+    get:
+      tags: [Attachments]
+      operationId: adminListAttachments
+      summary: Attachment metadata for any ticket
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+      responses:
+        "200":
+          description: Attachment list
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AttachmentListResponse" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/admin/tickets/{ticketId}/attachments/{attachmentId}:
+    get:
+      tags: [Attachments]
+      operationId: adminDownloadAttachment
+      summary: Download an attachment of any ticket (always as a download)
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - { $ref: "#/components/parameters/TicketId" }
+        - { $ref: "#/components/parameters/AttachmentId" }
+      responses:
+        "200": { $ref: "#/components/responses/AttachmentBytes" }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /api/v1/events/tickets:
+    get:
+      tags: [Events]
+      operationId: ticketEvents
+      summary: Server-Sent Events stream of ticket changes (ids only, no content)
+      description: |
+        Admins receive all events; an author receives only audience-all events for their own tickets. Event names: ticket.created,
+        ticket.updated, ticket.reply.created, ticket.analysis.updated (admin-only). data is {ticketId, occurredAt, version}.
+        Send Last-Event-ID to receive a ticket.updated for each in-scope ticket changed since that time.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          required: false
+          schema: { type: string, pattern: "^[0-9]{10,15}-[0-9]{1,7}$" }
+        - name: lastEventId
+          in: query
+          required: false
+          schema: { type: string, pattern: "^[0-9]{10,15}-[0-9]{1,7}$" }
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
+        "401": { $ref: "#/components/responses/Unauthenticated" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: bookleaf_session
+      description: Opaque server-side session token (cookie name is configurable via SESSION_COOKIE_NAME).
+    csrfToken:
+      type: apiKey
+      in: header
+      name: X-CSRF-Token
+      description: Value of the XSRF-TOKEN cookie. Required for non-GET requests that carry a session.
+  parameters:
+    TicketId: { name: ticketId, in: path, required: true, schema: { type: string } }
+    BookId: { name: bookId, in: path, required: true, schema: { type: string } }
+    AttachmentId: { name: attachmentId, in: path, required: true, schema: { type: string } }
+    Page: { name: page, in: query, required: false, schema: { type: integer, minimum: 1, default: 1 } }
+    PageSize: { name: pageSize, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100, default: 25 } }
+    Status: { name: status, in: query, required: false, schema: { $ref: "#/components/schemas/TicketStatus" } }
+    Category: { name: category, in: query, required: false, schema: { $ref: "#/components/schemas/TicketCategory" } }
+    Priority: { name: priority, in: query, required: false, schema: { $ref: "#/components/schemas/TicketPriority" } }
+    From: { name: from, in: query, required: false, description: Inclusive lower bound on createdAt., schema: { type: string } }
+    To: { name: to, in: query, required: false, description: Inclusive upper bound on createdAt; a date-only value includes the whole day., schema: { type: string } }
+  responses:
+    ValidationError:
+      description: VALIDATION_ERROR (400)
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    Unauthenticated:
+      description: UNAUTHENTICATED (401)
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    Forbidden:
+      description: FORBIDDEN (403) wrong role, untrusted Origin or missing/invalid CSRF token
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    NotFound:
+      description: NOT_FOUND (404), identical for missing and not-owned resources
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    Conflict:
+      description: CONFLICT (409) illegal transition, closed ticket, attachment limit, or nothing to unassign
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    RateLimited:
+      description: RATE_LIMITED (429)
+      headers:
+        Retry-After: { schema: { type: string }, description: Seconds until retry is allowed }
+      content: { application/json: { schema: { $ref: "#/components/schemas/ApiError" } } }
+    AttachmentBytes:
+      description: File bytes with Content-Disposition attachment, X-Content-Type-Options nosniff and CSP default-src 'none'; sandbox
+      headers:
+        Content-Disposition: { schema: { type: string } }
+        X-Content-Type-Options: { schema: { type: string, const: nosniff } }
+      content:
+        application/pdf: { schema: { type: string, format: binary } }
+        image/png: { schema: { type: string, format: binary } }
+        image/jpeg: { schema: { type: string, format: binary } }
+        image/webp: { schema: { type: string, format: binary } }
+        text/plain: { schema: { type: string, format: binary } }
+  schemas:
+    UserRole: { type: string, enum: [AUTHOR, ADMIN] }
+    TicketStatus: { type: string, enum: [OPEN, IN_PROGRESS, RESOLVED, CLOSED] }
+    TicketCategory: { type: string, enum: [ROYALTY_PAYMENTS, ISBN_METADATA, PRINTING_QUALITY, DISTRIBUTION_AVAILABILITY, BOOK_STATUS_PRODUCTION, GENERAL_INQUIRY] }
+    TicketPriority: { type: string, enum: [CRITICAL, HIGH, MEDIUM, LOW] }
+    ApiError:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, enum: [VALIDATION_ERROR, UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, CONFLICT, RATE_LIMITED, INTERNAL_ERROR] }
+            message: { type: string }
+            details:
+              description: For validation errors an array of {path, message}; shape for other errors is not fixed.
+              x-unverified: exact shape of details beyond validation errors
+            requestId: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+    AuthorProfile:
+      type: object
+      required: [id, userId, externalAuthorId, name, phone, city, joinedDate]
+      properties:
+        id: { type: string }
+        userId: { type: string }
+        externalAuthorId: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        city: { type: string }
+        joinedDate: { type: string, format: date }
+    CurrentUser:
+      type: object
+      required: [id, email, role, authorProfile]
+      properties:
+        id: { type: string }
+        email: { type: string, format: email }
+        role: { $ref: "#/components/schemas/UserRole" }
+        authorProfile:
+          oneOf:
+            - { $ref: "#/components/schemas/AuthorProfile" }
+            - { type: "null" }
+    AuthResponse:
+      type: object
+      required: [user]
+      properties:
+        user: { $ref: "#/components/schemas/CurrentUser" }
+    Book:
+      type: object
+      required: [id, externalBookId, authorId, title, isbn, genre, publicationDate, status, mrp, authorRoyaltyPerCopy, totalCopiesSold, totalRoyaltyEarned, royaltyPaid, royaltyPending, lastRoyaltyPayoutDate, printPartner, availableOn]
+      properties:
+        id: { type: string }
+        externalBookId: { type: string }
+        authorId: { type: string, description: AuthorProfile id }
+        title: { type: string }
+        isbn: { type: string }
+        genre: { type: string }
+        publicationDate: { type: [string, "null"], format: date }
+        status: { type: string }
+        mrp: { type: [integer, "null"] }
+        authorRoyaltyPerCopy: { type: [integer, "null"] }
+        totalCopiesSold: { type: integer }
+        totalRoyaltyEarned: { type: integer }
+        royaltyPaid: { type: integer }
+        royaltyPending: { type: integer }
+        lastRoyaltyPayoutDate: { type: [string, "null"], format: date }
+        printPartner: { type: [string, "null"] }
+        availableOn: { type: array, items: { type: string } }
+    Pagination:
+      type: object
+      required: [page, pageSize, total]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 100 }
+        total: { type: integer, minimum: 0 }
+    BookListResponse:
+      allOf:
+        - { $ref: "#/components/schemas/Pagination" }
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/Book" } }
+    TicketSummary:
+      type: object
+      required: [id, authorId, bookId, subject, status, category, priority, assigneeId, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        authorId: { type: string, description: AuthorProfile id }
+        bookId: { type: [string, "null"] }
+        subject: { type: string }
+        status: { $ref: "#/components/schemas/TicketStatus" }
+        category:
+          oneOf: [{ $ref: "#/components/schemas/TicketCategory" }, { type: "null" }]
+        priority:
+          oneOf: [{ $ref: "#/components/schemas/TicketPriority" }, { type: "null" }]
+        assigneeId: { type: [string, "null"], description: User id of the assigned admin }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    Ticket:
+      allOf:
+        - { $ref: "#/components/schemas/TicketSummary" }
+        - type: object
+          required: [description]
+          properties:
+            description: { type: string }
+    TicketResponse:
+      type: object
+      required: [ticket]
+      properties:
+        ticket: { $ref: "#/components/schemas/Ticket" }
+    TicketListResponse:
+      allOf:
+        - { $ref: "#/components/schemas/Pagination" }
+        - type: object
+          required: [items]
+          properties:
+            items: { type: array, items: { $ref: "#/components/schemas/TicketSummary" } }
+    CreateTicketRequest:
+      type: object
+      required: [bookId, subject, description]
+      properties:
+        bookId: { type: [string, "null"], minLength: 1, description: null for a general account ticket }
+        subject: { type: string, minLength: 3, maxLength: 200, description: Trimmed before validation }
+        description: { type: string, minLength: 10, maxLength: 10000, description: Trimmed before validation }
+    UpdateTicketRequest:
+      type: object
+      minProperties: 1
+      properties:
+        status: { $ref: "#/components/schemas/TicketStatus" }
+        category: { $ref: "#/components/schemas/TicketCategory" }
+        priority: { $ref: "#/components/schemas/TicketPriority" }
+    ReplyRequest:
+      type: object
+      required: [body]
+      properties:
+        body: { type: string, minLength: 1, maxLength: 10000, description: Trimmed before validation }
+    AssignTicketRequest:
+      type: object
+      required: [assigneeId]
+      properties:
+        assigneeId: { type: [string, "null"], description: "Must be the caller's own user id, or null to unassign" }
+    Message:
+      type: object
+      required: [id, ticketId, authorId, body, visibility, createdAt]
+      properties:
+        id: { type: string }
+        ticketId: { type: string }
+        authorId: { type: string, description: User id of the writer }
+        body: { type: string }
+        visibility: { type: string, enum: [AUTHOR, ADMIN] }
+        createdAt: { type: string, format: date-time }
+    AuthorMessage:
+      allOf:
+        - { $ref: "#/components/schemas/Message" }
+        - type: object
+          properties:
+            visibility: { type: string, const: AUTHOR }
+    MessageResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { $ref: "#/components/schemas/AuthorMessage" }
+    TicketDetailResponse:
+      type: object
+      required: [ticket, messages]
+      properties:
+        ticket: { $ref: "#/components/schemas/Ticket" }
+        messages: { type: array, items: { $ref: "#/components/schemas/AuthorMessage" } }
+    InternalNote:
+      type: object
+      required: [id, ticketId, authorId, body, createdAt]
+      properties:
+        id: { type: string }
+        ticketId: { type: string }
+        authorId: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+    InternalNoteResponse:
+      type: object
+      required: [note]
+      properties:
+        note: { $ref: "#/components/schemas/InternalNote" }
+    TicketAssignment:
+      type: object
+      required: [id, ticketId, assigneeId, assignedById, createdAt]
+      properties:
+        id: { type: string }
+        ticketId: { type: string }
+        assigneeId: { type: [string, "null"] }
+        assignedById: { type: string }
+        createdAt: { type: string, format: date-time }
+    AssignmentResponse:
+      type: object
+      required: [ticket, assignment]
+      properties:
+        ticket: { $ref: "#/components/schemas/Ticket" }
+        assignment: { $ref: "#/components/schemas/TicketAssignment" }
+    AuditEvent:
+      type: object
+      description: Raw before/after JSON is deliberately never exposed.
+      required: [id, actorId, action, entityType, entityId, requestId, createdAt]
+      properties:
+        id: { type: string }
+        actorId: { type: [string, "null"] }
+        action: { type: string }
+        entityType: { type: string }
+        entityId: { type: string }
+        requestId: { type: [string, "null"] }
+        createdAt: { type: string, format: date-time }
+    Attachment:
+      type: object
+      required: [id, ticketId, fileName, contentType, sizeBytes, createdAt]
+      properties:
+        id: { type: string }
+        ticketId: { type: string }
+        fileName: { type: string }
+        contentType: { type: string }
+        sizeBytes: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+    AttachmentResponse:
+      type: object
+      required: [attachment]
+      properties:
+        attachment: { $ref: "#/components/schemas/Attachment" }
+    AttachmentListResponse:
+      type: object
+      required: [items]
+      properties:
+        items: { type: array, items: { $ref: "#/components/schemas/Attachment" } }
+    AiAnalysis:
+      type: object
+      required: [category, priority, confidence, rationale, draftResponse, requiresHumanReview, knowledgeBaseCitations]
+      properties:
+        category: { $ref: "#/components/schemas/TicketCategory" }
+        priority: { $ref: "#/components/schemas/TicketPriority" }
+        confidence: { type: number, minimum: 0, maximum: 1 }
+        rationale: { type: string }
+        draftResponse: { type: string, description: "Suggestion for an admin, never an author-visible message by itself" }
+        requiresHumanReview: { type: boolean, const: true }
+        knowledgeBaseCitations: { type: array, items: { type: string } }
+    AiAttempt:
+      description: Discriminated by status. Mock-provider output on staging is demonstration text, not model inference.
+      oneOf:
+        - type: object
+          required: [id, ticketId, createdAt, status, analysis, errorCode]
+          properties:
+            id: { type: string }
+            ticketId: { type: string }
+            createdAt: { type: string, format: date-time }
+            status: { type: string, const: PENDING }
+            analysis: { type: "null" }
+            errorCode: { type: "null" }
+        - type: object
+          required: [id, ticketId, createdAt, status, analysis, errorCode]
+          properties:
+            id: { type: string }
+            ticketId: { type: string }
+            createdAt: { type: string, format: date-time }
+            status: { type: string, const: COMPLETED }
+            analysis: { $ref: "#/components/schemas/AiAnalysis" }
+            errorCode: { type: "null" }
+        - type: object
+          required: [id, ticketId, createdAt, status, analysis, errorCode]
+          properties:
+            id: { type: string }
+            ticketId: { type: string }
+            createdAt: { type: string, format: date-time }
+            status: { type: string, const: FAILED }
+            analysis: { type: "null" }
+            errorCode: { type: string, minLength: 1, examples: [AI_TIMEOUT, AI_NOT_CONFIGURED, AI_UNGROUNDED_OUTPUT] }
+    AiAttemptResponse:
+      type: object
+      required: [analysis]
+      properties:
+        analysis: { $ref: "#/components/schemas/AiAttempt" }
+    AdminTicketDetailResponse:
+      type: object
+      required: [ticket, author, book, messages, internalNotes, assignments, aiAnalysis, auditEvents]
+      properties:
+        ticket: { $ref: "#/components/schemas/Ticket" }
+        author: { $ref: "#/components/schemas/AuthorProfile" }
+        book:
+          oneOf: [{ $ref: "#/components/schemas/Book" }, { type: "null" }]
+        messages: { type: array, items: { $ref: "#/components/schemas/Message" } }
+        internalNotes: { type: array, items: { $ref: "#/components/schemas/InternalNote" } }
+        assignments: { type: array, items: { $ref: "#/components/schemas/TicketAssignment" } }
+        aiAnalysis:
+          oneOf: [{ $ref: "#/components/schemas/AiAttempt" }, { type: "null" }]
+        auditEvents: { type: array, items: { $ref: "#/components/schemas/AuditEvent" } }

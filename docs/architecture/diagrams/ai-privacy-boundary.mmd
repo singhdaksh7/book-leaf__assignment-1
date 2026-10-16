@@ -1,0 +1,36 @@
+%% file: ai-privacy-boundary.mmd
+flowchart LR
+    subgraph DB["PostgreSQL (trusted store)"]
+        T["Ticket subject and description"]
+        H["Last 2 AUTHOR-visible messages"]
+        BK["Book: title, status, genre, publication date, print partner, available-on"]
+        FIN["Book: ISBN, MRP, royalty per copy, copies sold, royalty earned, paid, pending, payout date"]
+        AP["AuthorProfile: name, phone, city, external id"]
+        EM["User: e-mail, password hash"]
+        IN["Internal notes, audit log, other tickets and authors"]
+        AT["Attachments (bytes and metadata)"]
+    end
+
+    subgraph SAFE["Allowed to leave the trust boundary (after sanitising and PII redaction)"]
+        P1["Ticket text, truncated: subject 200, description 2 000 chars"]
+        P2["History: 2 messages, 300 chars each"]
+        P3["Whitelisted book facts"]
+        P4["Policy excerpts and tone guidelines from the static knowledge base"]
+    end
+
+    PROV["External provider<br/>OpenRouter (production)"]
+    LOCAL["Used locally only:<br/>author first name for the greeting placeholder"]
+
+    T --> P1
+    H --> P2
+    BK --> P3
+    P1 --> PROV
+    P2 --> PROV
+    P3 --> PROV
+    P4 --> PROV
+    AP -- "name only" --> LOCAL
+    FIN -. "blocked: two allow-lists" .-x PROV
+    EM -. "blocked" .-x PROV
+    IN -. "blocked: never loaded for AI" .-x PROV
+    AT -. "blocked: not an AI input" .-x PROV
+    AP -. "phone, city, id blocked" .-x PROV

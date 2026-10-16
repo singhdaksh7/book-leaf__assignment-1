@@ -1,0 +1,27 @@
+%% file: frontend-routing.mmd
+flowchart LR
+    U(("URL")) --> L{"/login"}
+    L -- "yes" --> LP["LoginPage"]
+    LP -- "success: ADMIN" --> AD["/admin/dashboard"]
+    LP -- "success: AUTHOR" --> DB["/dashboard"]
+    LP -- "success with redirect state" --> BACK["originally requested path"]
+
+    U --> ROOT{"/"}
+    ROOT -- "index" --> DB
+    ROOT --> PR{"ProtectedRoute<br/>user loaded?"}
+    PR -- "loading" --> SP["splash 'Loading BookLeaf Author Portal'"]
+    PR -- "no user" --> LR["Navigate to /login with from-location state"]
+    PR -- "user" --> AL["AppLayout"]
+
+    AL --> A1["/dashboard"]
+    AL --> A2["/books"]
+    AL --> A3["/books/:bookId"]
+    AL --> A4["/tickets"]
+    AL --> A5["/tickets/new"]
+    AL --> A6["/tickets/:ticketId"]
+    AL --> RR{"requiredRole = ADMIN?"}
+    RR -- "role is ADMIN" --> B1["/admin/dashboard"]
+    RR -- "role is ADMIN" --> B2["/admin/queue"]
+    RR -- "role is ADMIN" --> B3["/admin/tickets/:ticketId"]
+    RR -- "role is AUTHOR" --> DENY["'Access Restricted' panel (no redirect)"]
+    U --> NF["any other path: NotFoundPage"]

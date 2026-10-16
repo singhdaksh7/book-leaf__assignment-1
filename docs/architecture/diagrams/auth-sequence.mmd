@@ -1,0 +1,30 @@
+%% file: auth-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser (SPA)
+    participant T as Traefik (TLS)
+    participant A as Express (authenticate, csrfProtection)
+    participant L as Auth router POST /auth/login
+    participant DB as PostgreSQL
+
+    B->>T: POST /api/v1/auth/login {email, password}, Origin: https://host
+    T->>A: forward (HTTP, X-Forwarded-For)
+    A->>A: authenticate: no session cookie, so req.auth is empty
+    A->>A: csrfProtection: anonymous request, passes through
+    A->>L: route
+    L->>L: assertTrustedOrigin (Origin must equal WEB_ORIGIN)
+    L->>L: Zod: valid email, non-empty password, email trimmed and lower-cased
+    L->>L: throttle check (per IP+account and per IP), else 429 Retry-After
+    L->>DB: SELECT User by email, include AuthorProfile
+    L->>L: Argon2id verify against stored hash, or against a dummy hash if the email is unknown
+    alt unknown email or wrong password
+        L->>L: record failure for IP and account
+        L-->>B: 401 UNAUTHENTICATED "Invalid email or password" (same message and similar timing)
+    else credentials valid
+        L->>L: reset the account failure counter
+        L->>L: token = 32 random bytes (base64url)
+        L->>DB: INSERT Session(tokenHash = SHA-256(token), userId, expiresAt = now + TTL)
+        L->>DB: keep newest 10 sessions for the user, delete expired and older ones
+        L-->>B: 200 {user}, Set-Cookie bookleaf_session = token (HttpOnly, Secure in production, SameSite=Lax, Path=/, Expires)
+        L-->>B: Set-Cookie XSRF-TOKEN = HMAC(SESSION_SECRET, "csrf:" + sessionId) (not HttpOnly, same flags)
+    end

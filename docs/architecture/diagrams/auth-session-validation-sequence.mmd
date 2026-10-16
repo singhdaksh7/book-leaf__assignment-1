@@ -1,0 +1,26 @@
+%% file: auth-session-validation-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant A as authenticate middleware
+    participant DB as PostgreSQL
+    participant S as SSE stream (events router)
+
+    B->>A: any /api/v1 request with cookie
+    A->>A: token length between 20 and 200 characters, else ignored
+    A->>DB: find Session by tokenHash
+    alt no row or expiresAt <= now
+        A->>A: req.auth stays unset, so protected routes answer 401
+    else live session
+        A->>A: req.auth set (no extension of expiresAt)
+    end
+    B->>A: GET /auth/me (page load)
+    A-->>B: 200 {user} and re-issued XSRF-TOKEN cookie (same expiry)
+    loop every 25 s while a stream is open
+        S->>DB: SELECT Session by id
+        alt row missing or expired
+            S-->>B: close the stream
+        else valid
+            S-->>B: ": ping" comment
+        end
+    end

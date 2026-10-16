@@ -1,0 +1,23 @@
+%% file: auth-unauthorized-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant X as Client (anonymous, wrong role or attacker)
+    participant A as Express
+    participant G as Guards
+    participant H as Handler
+
+    X->>A: request to a protected /api/v1 path
+    A->>A: authenticate, then csrfProtection
+    alt no valid session
+        A->>G: requireAuth, requireAuthor or requireRole
+        G-->>X: 401 UNAUTHENTICATED "Authentication is required"
+    else valid session, mutating request, bad Origin or CSRF token
+        A-->>X: 403 FORBIDDEN
+    else valid session, wrong role
+        G-->>X: 403 FORBIDDEN "You do not have access to this resource"
+    else valid session, right role, resource owned by another author
+        H-->>X: 404 NOT_FOUND (existence not revealed)
+    else too many failed logins or open streams or creations
+        A-->>X: 429 RATE_LIMITED with Retry-After
+    end
+    Note over X,H: Unknown routes under /api/v1 return 404 "Route not found". Error bodies carry only code, message, optional validation paths and the request id.

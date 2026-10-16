@@ -1,0 +1,27 @@
+%% file: auth-request-rbac-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant A as Express middleware
+    participant R as Router guard
+    participant H as Handler
+    participant DB as PostgreSQL
+
+    B->>A: GET /api/v1/author/tickets/T1 (Cookie: bookleaf_session)
+    A->>DB: Session by SHA-256(token) with User and AuthorProfile
+    DB-->>A: session row
+    A->>A: expired? no, so req.auth = {sessionId, user{id,email,role}, authorProfile}
+    A->>R: requireAuthor
+    alt role is not AUTHOR or no AuthorProfile
+        R-->>B: 403 FORBIDDEN
+    else author
+        R->>H: handler
+        H->>DB: SELECT Ticket WHERE id = T1 AND authorId = session.authorProfile.id
+        alt row not found (missing OR belongs to another author)
+            H-->>B: 404 NOT_FOUND "Ticket not found" (identical in both cases)
+        else row found
+            H->>DB: SELECT TicketMessage WHERE ticketId = T1 AND visibility = AUTHOR
+            H-->>B: 200 {ticket, messages} (internal notes never queried)
+        end
+    end
+    Note over B,H: Admin routes use requireRole("ADMIN"): an AUTHOR session gets 403 on every /admin path, an ADMIN session gets 403 on every /author path.

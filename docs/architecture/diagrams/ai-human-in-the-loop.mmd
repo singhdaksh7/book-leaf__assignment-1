@@ -1,0 +1,12 @@
+%% file: ai-human-in-the-loop.mmd
+flowchart LR
+    A["AiAnalysis row<br/>PENDING, COMPLETED or FAILED"] -->|"GET /admin/tickets/:id<br/>(admin only)"| P["Admin workbench AI panel<br/>category, priority, confidence, rationale, citations, draft"]
+    P --> Q{"Admin decision"}
+    Q -- "ignore" --> N["Nothing is sent, ticket unchanged"]
+    Q -- "re-run" --> R["POST /admin/tickets/:id/ai-analysis<br/>30 s cooldown, new attempt"] --> A
+    Q -- "accept suggested category or priority" --> U["admin sets values in the form,<br/>PATCH /admin/tickets/:id (audited)"]
+    Q -- "use draft" --> X["'Use AI draft' copies text into the reply box"]
+    X --> ED["Admin edits freely, removes any demo label"]
+    ED --> SEND["POST /admin/tickets/:id/replies<br/>the only action that creates an author-visible message"]
+    SEND --> AU["Author sees only the sent text<br/>no AI metadata, no internal notes"]
+    A -. "never exposed" .-> AU

@@ -1,0 +1,37 @@
+%% file: ticket-conversation-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant AU as Author browser
+    participant API as API
+    participant DB as PostgreSQL
+    participant HUB as TicketEventHub
+    participant AD as Admin browser
+
+    Note over AD,API: Admin opens the ticket workbench
+    AD->>API: GET /admin/tickets/:id
+    API->>DB: ticket, author, book, ALL messages, internal notes, assignments, latest AI attempt, last 100 audit events
+    API-->>AD: adminTicketDetail
+
+    AD->>API: PUT /admin/tickets/:id/assignment {assigneeId: self}
+    API->>DB: lock ticket, INSERT TicketAssignment, UPDATE Ticket.assigneeId, INSERT AuditLog
+    API->>HUB: publish ticket.updated (all)
+
+    AD->>API: POST /admin/tickets/:id/internal-notes {body}
+    API->>DB: lock ticket, INSERT InternalNote, INSERT AuditLog
+    API->>HUB: publish ticket.updated (audience admin only, nothing reaches the author)
+
+    AD->>API: PATCH /admin/tickets/:id {status, category, priority}
+    API->>DB: lock ticket, validate transition, UPDATE Ticket, one AuditLog row per changed field
+    API->>HUB: publish ticket.updated (all)
+
+    AD->>API: POST /admin/tickets/:id/replies {body}
+    API->>DB: lock ticket (409 if CLOSED), duplicate check (same body within 60 s returns the original), INSERT TicketMessage visibility AUTHOR, bump updatedAt, INSERT AuditLog
+    API->>HUB: publish ticket.reply.created (all)
+    HUB-->>AU: SSE event {ticketId, occurredAt, version}
+    AU->>API: GET /author/tickets/:id (refetch)
+    API-->>AU: ticket and AUTHOR-visible messages only
+
+    AU->>API: POST /author/tickets/:id/messages {body}
+    API->>DB: lock ticket (own tickets only, 409 if CLOSED), duplicate check, INSERT TicketMessage AUTHOR, bump updatedAt, INSERT AuditLog ticket.author_reply.created
+    API->>HUB: publish ticket.reply.created (all)
+    Note over AD: Delivered to the admin's stream, but the current admin pages do not subscribe, so an admin sees the new message after reloading or acting on the page.

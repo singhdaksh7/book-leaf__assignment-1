@@ -1,0 +1,138 @@
+%% file: database-erd.mmd
+erDiagram
+    User ||--o| AuthorProfile : "has profile - Cascade"
+    User ||--o{ Session : "owns - Cascade"
+    AuthorProfile ||--o{ Book : "owns - Restrict"
+    AuthorProfile ||--o{ Ticket : "raises - Restrict"
+    Book |o--o{ Ticket : "subject of - SetNull"
+    User |o--o{ Ticket : "assignee - SetNull"
+    Ticket ||--o{ TicketMessage : "has - Cascade"
+    User ||--o{ TicketMessage : "writes - Restrict"
+    Ticket ||--o{ InternalNote : "has - Cascade"
+    User ||--o{ InternalNote : "writes - Restrict"
+    Ticket ||--o{ TicketAssignment : "history - Cascade"
+    User |o--o{ TicketAssignment : "assignee - SetNull"
+    User ||--o{ TicketAssignment : "assigned by - Restrict"
+    Ticket ||--o{ AiAnalysis : "attempts - Cascade"
+    Ticket ||--o{ TicketAttachment : "has - Cascade"
+    User ||--o{ TicketAttachment : "uploads - Restrict"
+    User |o--o{ AuditLog : "actor - SetNull"
+
+    User {
+        string id PK "cuid"
+        string email UK "normalised lower-case"
+        string passwordHash "Argon2id"
+        UserRole role "AUTHOR or ADMIN"
+        datetime createdAt
+        datetime updatedAt
+    }
+    AuthorProfile {
+        string id PK "cuid"
+        string userId FK, UK "1:1 to User"
+        string externalAuthorId UK "source dataset id"
+        string name "indexed"
+        string phone
+        string city
+        date joinedDate
+    }
+    Book {
+        string id PK "cuid"
+        string externalBookId UK "source dataset id"
+        string authorId FK "AuthorProfile.id"
+        string title
+        string isbn
+        string genre
+        date publicationDate "nullable"
+        string status "free text from source"
+        int mrp "nullable"
+        int authorRoyaltyPerCopy "nullable"
+        int totalCopiesSold
+        int totalRoyaltyEarned
+        int royaltyPaid
+        int royaltyPending
+        date lastRoyaltyPayoutDate "nullable"
+        string printPartner "nullable"
+        string_array availableOn "text[]"
+    }
+    Session {
+        string id PK "cuid"
+        string tokenHash UK "SHA-256 of cookie token"
+        string userId FK
+        datetime expiresAt "indexed"
+        datetime createdAt
+    }
+    Ticket {
+        string id PK "cuid"
+        string authorId FK "AuthorProfile.id"
+        string bookId FK "nullable"
+        string subject
+        string description
+        TicketStatus status "default OPEN"
+        TicketCategory category "nullable"
+        TicketPriority priority "nullable"
+        string assigneeId FK "nullable User.id"
+        datetime createdAt
+        datetime updatedAt "bumped on every change"
+    }
+    TicketMessage {
+        string id PK "cuid"
+        string ticketId FK
+        string authorId FK "User.id"
+        string body
+        MessageVisibility visibility "default AUTHOR"
+        datetime createdAt
+    }
+    InternalNote {
+        string id PK "cuid"
+        string ticketId FK
+        string authorId FK "User.id (admin)"
+        string body
+        datetime createdAt
+    }
+    TicketAssignment {
+        string id PK "cuid"
+        string ticketId FK
+        string assigneeId FK "nullable User.id"
+        string assignedById FK "User.id"
+        datetime createdAt
+    }
+    AiAnalysis {
+        string id PK "cuid"
+        string ticketId FK
+        AiAnalysisStatus status "PENDING COMPLETED FAILED"
+        string model "nullable"
+        string promptVersion
+        TicketCategory category "nullable"
+        TicketPriority priority "nullable"
+        float confidence "nullable 0..1"
+        string rationale "nullable"
+        string draftResponse "nullable"
+        json citations "nullable string array"
+        int inputTokens "nullable"
+        int outputTokens "nullable"
+        int costMicrounits "nullable"
+        string errorCode "nullable"
+        datetime createdAt
+    }
+    AuditLog {
+        string id PK "cuid"
+        string actorId FK "nullable User.id"
+        string action
+        string entityType "no FK, polymorphic"
+        string entityId "no FK, polymorphic"
+        json before "nullable"
+        json after "nullable"
+        string requestId "nullable"
+        datetime createdAt
+    }
+    TicketAttachment {
+        string id PK "cuid"
+        string ticketId FK
+        string uploaderId FK "User.id"
+        string fileName "sanitised label"
+        string contentType
+        int sizeBytes
+        string storageKey UK "random 48 hex chars"
+        string sha256
+        datetime createdAt
+    }
