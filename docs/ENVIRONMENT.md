@@ -36,9 +36,11 @@ The same code runs in three clearly separate settings:
 
 | Setting | Provider | What the output is |
 | --- | --- | --- |
-| **Production** | OpenRouter (`OPENROUTER_API_KEY` set; paid) | Real model inference, checked by the grounding/privacy validators; an admin reviews every draft |
+| **Production** | OpenRouter (`OPENROUTER_API_KEY` set; zero-cost `:free` model, verified $0 per token) | Real model inference, checked by the grounding/privacy validators; an admin reviews every draft |
 | **Automated tests** | Local mock HTTP servers started by the test suites (API real-package tests, Playwright E2E) | Scripted responses; no network, no cost |
 | **Opt-in staging demo** | `infra/mock-ai` ([Deployment](../infra/DEPLOY.md)) | Canned, keyword-matched text labelled `[DEMO MOCK]` (rationale) and `[DEMO DRAFT]` (draft); **not AI inference**. Never enable in production |
+
+**Reviewer setup (own key, optional).** The hosted demo already has a server-side key; reviewers do not need one. To run your own copy, create a key at openrouter.ai, put it only in the server environment (`apps/api/.env` locally, or the API container environment), and restart the API. Set `OPENROUTER_API_KEY`; `OPENROUTER_MODEL` is optional (default below, `:free` ids only). The key is never read by the web app, there is no UI that accepts a key, and `apps/api/.env` is git-ignored. Free-tier keys allow about 50 free-model requests per day (each ticket analysis uses 2), so heavy testing may fall back to the deterministic policy draft.
 
 Production never falls back to fabricated output: without a key, or when the provider fails, the attempt is `FAILED` and admins work manually.
 
@@ -49,7 +51,7 @@ Production never falls back to fabricated output: without a key, or when the pro
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | `https://` required, except `http://localhost` / `127.0.0.1` (used by the tests' mock provider and by the staging demo mock, which runs as a supervised process inside the API container so it can be reached on loopback). |
 | `AI_TIMEOUT_MS` / `AI_MAX_RETRIES` | `15000` / `2` | |
 | `AI_RETRY_BASE_DELAY_MS` / `AI_RETRY_MAX_DELAY_MS` | `500` / `4000` | |
-| `AI_MAX_OUTPUT_TOKENS` | `400` | |
+| `AI_MAX_OUTPUT_TOKENS` | `800` | Upper bound per completion; 400 truncated valid JSON drafts. |
 
 ## Database tooling (`packages/db`)
 

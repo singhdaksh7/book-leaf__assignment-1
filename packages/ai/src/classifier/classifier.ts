@@ -7,7 +7,7 @@ import type { LlmProvider } from "../provider/types.js";
 import { detectInjection } from "../safety.js";
 import type { AiLogger, UsageRecord } from "../usage.js";
 import type { AnalyzeTicketInput } from "../types.js";
-import { heuristicClassify, priorityFloor } from "./heuristics.js";
+import { heuristicClassify, isLiveMetadataUpdateRequest, policyPriority, priorityFloor } from "./heuristics.js";
 import { buildClassifierPrompt, DEFAULT_CLASSIFIER_LIMITS, pickBookFacts, type ClassifierLimits } from "./prompt.js";
 import { parseModelClassification } from "./schema.js";
 
@@ -98,6 +98,14 @@ export function createTicketClassifier(options: TicketClassifierOptions): Ticket
         : `Classified as ${CATEGORY_LABELS[parsed.category]} based on the ticket content. Please review.`;
 
       const confidence = securityFlags.length > 0 ? Math.min(parsed.confidence, INJECTION_CONFIDENCE_CAP) : parsed.confidence;
+      // Deterministic policy rule beats the model: a live-book description/metadata update question is a General Inquiry.
+      if (parsed.category !== "GENERAL_INQUIRY" && isLiveMetadataUpdateRequest(ticketText)) {
+        return {
+          category: "GENERAL_INQUIRY", priority: policyPriority("GENERAL_INQUIRY", ticketText.toLowerCase()), confidence,
+          rationale: `Classified as ${CATEGORY_LABELS.GENERAL_INQUIRY}: a request to update a live book's description or metadata. Please review.`,
+          citations: citationsFor("GENERAL_INQUIRY", chunks), retrievedChunkIds: chunkIds, source: "model", securityFlags, groundingIssues, usage: completion.usage, providerFailed: false
+        };
+      }
       return {
         category: parsed.category, priority: maxPriority(parsed.priority, priorityFloor(parsed.category, ticketText)), confidence,
         rationale, citations, retrievedChunkIds: chunkIds, source: "model", securityFlags, groundingIssues, usage: completion.usage, providerFailed: false

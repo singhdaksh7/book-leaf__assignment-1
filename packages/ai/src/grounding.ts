@@ -9,6 +9,11 @@ export type GroundingIssueKind =
 export interface GroundingOptions {
   /** Author-facing drafts: also reject payout promises, links/contact details and refund/compensation commitments. */
   strict?: boolean;
+  /**
+   * Text that may justify a time frame (strict mode). Defaults to all sources. Drafts pass only the answered topic's policy plus the
+   * ticket, so a timeline from an unrelated topic that happened to be in the prompt (7–10 days for new listings) is rejected.
+   */
+  timelineText?: string;
 }
 export interface GroundingIssue { kind: GroundingIssueKind; detail: string; }
 
@@ -32,6 +37,10 @@ const COMPLETED_ACTION_PATTERNS: RegExp[] = [
   new RegExp(`\\balready\\s+(?:${ACTION_VERBS})\\b`, "i"),
   new RegExp(`\\b(?:was|were)\\s+(?:successfully\\s+)?(?:${ACTION_VERBS})\\b`, "i")
 ];
+
+// Indexes of the state patterns ("has been fixed", "is resolved") that can legitimately follow a conditional lead-in.
+const CONDITIONAL_PATTERN_INDEXES = new Set([1, 3]);
+const CONDITIONAL_LEAD = /\b(?:to (?:confirm|ensure|verify|check|see)|once|until|when|whenever|if|whether|after|before|as soon as)\b[^.!?;]*$/i;
 
 const normNumber = (n: string) => n.replace(/,/g, "").replace(/\.0+$/, "");
 const normDate = (d: string) => d.toLowerCase().replace(/(\d)(?:st|nd|rd|th)\b/g, "$1").replace(/[,\s]+/g, " ").trim();
@@ -67,10 +76,13 @@ export function findUnsupportedClaims(output: string, sources: readonly Groundin
   for (const n of new Set(remainder.match(NUMBER) ?? [])) {
     if (!allowedNumbers.has(normNumber(n))) issues.push({ kind: "ungrounded-number", detail: n });
   }
-  for (const re of COMPLETED_ACTION_PATTERNS) {
+  for (const [i, re] of COMPLETED_ACTION_PATTERNS.entries()) {
     const m = re.exec(output);
-    if (m) issues.push({ kind: "completed-action", detail: m[0] });
+    if (!m) continue;
+    // "to confirm the issue is resolved" / "once it has been fixed" describe a future condition, not a completed action.
+    if (CONDITIONAL_PATTERN_INDEXES.has(i) && CONDITIONAL_LEAD.test(output.slice(0, m.index).split(/[.!?;\n]/).pop() ?? "")) continue;
+    issues.push({ kind: "completed-action", detail: m[0] });
   }
-  if (options.strict) issues.push(...strictIssues(output, corpus), ...findUnsafeMarkup(output));
+  if (options.strict) issues.push(...strictIssues(output, corpus, options.timelineText ?? corpus), ...findUnsafeMarkup(output));
   return issues;
 }

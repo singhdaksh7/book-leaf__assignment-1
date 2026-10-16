@@ -15,7 +15,7 @@ export interface KbChunk {
 }
 
 /** Bump when any chunk text changes so stored citations can be traced to a policy version. */
-export const KB_VERSION = "bookleaf-assignment-kb-v1";
+export const KB_VERSION = "bookleaf-assignment-kb-v2";
 
 export const KB_CHUNKS: readonly KbChunk[] = [
   {
@@ -65,6 +65,16 @@ export const KB_CHUNKS: readonly KbChunk[] = [
       "Books are listed on Amazon India, Flipkart, Amazon US, Amazon UK, and the BookLeaf Store.",
       "New listings typically go live within 7–10 business days after publication is complete.",
       "If a book is showing as unavailable on a platform, it usually indicates a stock sync issue—BookLeaf's team can trigger a re-sync within 24–48 hours."
+    ].join("\n")
+  },
+  {
+    // Source: the assignment's sample answer for "Can I update the description of my book on Amazon after it's already live?".
+    // Kept as its own topic so its 3–5 business days are never confused with the 7–10 days for new listings.
+    id: "kb.metadata-updates", topic: "Metadata Updates for Live Books", kind: "policy", categories: ["GENERAL_INQUIRY"],
+    keywords: ["update", "change", "edit", "description", "metadata", "already live", "after it's live", "blurb", "author bio", "listing details"],
+    content: [
+      "Metadata updates (for example a book's description) can be submitted through the dashboard or by emailing the BookLeaf team.",
+      "Changes typically reflect on platforms within 3–5 business days."
     ].join("\n")
   },
   {

@@ -10,7 +10,14 @@ const UI_LABEL = /['‘"“]([A-Z][A-Za-z &-]{2,40})['’"”]\s+(?:section|tab|
 const REPLY_EMAIL = /\b(?:reply|respond) to this e-?mail\b/i;
 const PAYOUT_WORDS = /\b(?:payout|payment|royalt\w*|transfer\w*)/i;
 const CURRENCY = /[₹$]\s?\d|\b(?:rs\.?|inr)\s?\d/i;
-const PAYOUT_FUTURE = /\byou(?:'ll| will)\s+(?:receive|get|be paid)\b|\bwill\s+(?:be\s+)?(?:paid|credited|transferred|processed|released|disbursed|sent|arrive|reach)\b|\b(?:is|are)\s+(?:scheduled|due|on (?:its|the) way)\b/i;
+const PAYOUT_FUTURE = /\byou(?:'ll| will)\s+(?:receive|get|be paid)\b|\bwill\s+(?:be\s+)?(?:paid|credited|transferred|processed|released|disbursed|sent|arrive|reach)\b/i;
+// "If royalties are due ..." states a condition. Only an unconditional "is scheduled / due / on its way" is a payout promise.
+const PAYOUT_DUE = /\b(?:is|are)\s+(?:scheduled|due|on (?:its|the) way)\b/i;
+const CONDITIONAL_LEAD = /\b(?:if|whether|when|once|unless|until)\b[^.!?;]*$/i;
+const payoutDue = (sentence: string): boolean => {
+  const m = PAYOUT_DUE.exec(sentence);
+  return !!m && !CONDITIONAL_LEAD.test(sentence.slice(0, m.index));
+};
 
 // "N unit" / "N–M unit" / "48-hour". Business-day wording is ignored so "5–7 business days" equals "5–7 days".
 const DURATION = /(\d+)(?:\s*[–-]\s*(\d+))?[\s-]*(?:business[\s-]+)?(hour|day|week|month|quarter)s?\b/gi;
@@ -28,7 +35,7 @@ function durationKeys(text: string): Set<string> {
  * sources (so "within 7 days" is rejected even though "7" occurs in "5–7 business days"), and spelled-out or relative
  * time frames are rejected unless the author or policy used the same words.
  */
-export function strictIssues(output: string, corpus: string): GroundingIssue[] {
+export function strictIssues(output: string, corpus: string, timelineCorpus: string = corpus): GroundingIssue[] {
   const issues: GroundingIssue[] = [];
   const link = LINK.exec(output);
   if (link) issues.push({ kind: "unsupported-link", detail: link[0] });
@@ -42,11 +49,11 @@ export function strictIssues(output: string, corpus: string): GroundingIssue[] {
   const email = REPLY_EMAIL.exec(output);
   if (email) issues.push({ kind: "unsupported-feature", detail: email[0] });
 
-  const allowedDurations = durationKeys(corpus);
+  const allowedDurations = durationKeys(timelineCorpus);
   for (const key of durationKeys(output)) {
     if (!allowedDurations.has(key)) issues.push({ kind: "unsupported-timeline", detail: key.replace("|", " ") });
   }
-  const lowerCorpus = corpus.toLowerCase();
+  const lowerCorpus = timelineCorpus.toLowerCase();
   for (const m of output.matchAll(WORD_TIMEFRAME)) {
     if (!lowerCorpus.includes(m[0].toLowerCase())) issues.push({ kind: "unsupported-timeline", detail: m[0] });
   }
@@ -60,7 +67,7 @@ export function strictIssues(output: string, corpus: string): GroundingIssue[] {
     if (!PAYOUT_WORDS.test(sentence)) continue;
     const dated = datesIn(sentence).length > 0 && /\b(?:will|shall|expect\w*|by)\b/i.test(sentence);
     const amountPromised = CURRENCY.test(sentence) && /\bwill\s+(?:be\s+)?(?:paid|credited|transferred|received|sent|arrive|reach)\b/i.test(sentence);
-    if (dated || amountPromised || PAYOUT_FUTURE.test(sentence)) issues.push({ kind: "payout-promise", detail: sentence.trim().slice(0, 80) });
+    if (dated || amountPromised || PAYOUT_FUTURE.test(sentence) || payoutDue(sentence)) issues.push({ kind: "payout-promise", detail: sentence.trim().slice(0, 80) });
   }
   return issues;
 }

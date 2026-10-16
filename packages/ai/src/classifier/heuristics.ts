@@ -16,6 +16,21 @@ const CATEGORY_TERMS: Record<TicketCategory, readonly RegExp[]> = {
 
 const ISBN_ERROR = /आईएसबीएन.{0,40}(गलत|अलग|डुप्लिकेट)|(गलत|अलग|डुप्लिकेट).{0,40}आईएसबीएन|(duplicate|different|wrong|incorrect|mismatch|doesn'?t match|not matching|another book).{0,60}\bisbn\b|\bisbn\b.{0,80}(duplicate|different|wrong|incorrect|mismatch|doesn'?t match|not matching|another book|error)/;
 
+const UPDATE_VERB = /\b(update|change|edit|modify|revise|amend)\b/;
+const METADATA_NOUN = /\b(description|blurb|metadata|listing details|book details|author bio|bio)\b/;
+const LIVE_CONTEXT = /\b(live|already published|is published|was published|after (?:it'?s|it is|my book is|publication|publishing)|on (?:amazon|flipkart))\b/;
+// A problem report (wrong/unavailable/ISBN) is not a how-do-I-update question and keeps its own category.
+const PROBLEM_REPORT = /\b(wrong|incorrect|error|mistake|duplicate|isbn|not (?:showing|updating|reflecting|visible|listed)|unavailable|out of stock)\b/;
+
+/**
+ * "Can I update the description of my book on Amazon after it's already live?" is a General Inquiry in the assignment's own
+ * sample set, even though it mentions Amazon and a description.
+ */
+export function isLiveMetadataUpdateRequest(text: string): boolean {
+  const t = text.toLowerCase();
+  return UPDATE_VERB.test(t) && METADATA_NOUN.test(t) && LIVE_CONTEXT.test(t) && !PROBLEM_REPORT.test(t);
+}
+
 export function scoreCategories(text: string): Array<{ category: TicketCategory; score: number }> {
   const t = text.toLowerCase();
   return ticketCategories
@@ -34,8 +49,8 @@ export function heuristicClassify(text: string): { category: TicketCategory; pri
   const t = text.toLowerCase();
   const [top, second] = scoreCategories(t);
   // ISBN errors outrank loose royalty/distribution mentions ("ISBN on Amazon").
-  const category: TicketCategory = ISBN_ERROR.test(t) ? "ISBN_METADATA" : top && top.score > 0 ? top.category : "GENERAL_INQUIRY";
-  return { category, priority: policyPriority(category, t), matched: category !== "GENERAL_INQUIRY", ambiguous: category !== "ISBN_METADATA" && !!top && top.score > 0 && top.score === second?.score };
+  const category: TicketCategory = isLiveMetadataUpdateRequest(t) ? "GENERAL_INQUIRY" : ISBN_ERROR.test(t) ? "ISBN_METADATA" : top && top.score > 0 ? top.category : "GENERAL_INQUIRY";
+  return { category, priority: policyPriority(category, t), matched: category !== "GENERAL_INQUIRY" || isLiveMetadataUpdateRequest(t), ambiguous: category !== "ISBN_METADATA" && !isLiveMetadataUpdateRequest(t) && !!top && top.score > 0 && top.score === second?.score };
 }
 
 const LEGAL_OR_FRAUD = /\b(lawyer|legal action|legal notice|sue\b|court|fraud|scam|cheat(ed|ing)|consumer forum|police)\b/;

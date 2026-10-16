@@ -14,7 +14,7 @@ export interface DrafterLimits {
 }
 export const DEFAULT_DRAFTER_LIMITS: DrafterLimits = {
   maxSubjectChars: 200, maxDescriptionChars: 2_000, maxHistoryMessages: 2, maxHistoryChars: 300,
-  maxPolicyChunks: 2, maxPolicyChars: 1_800, maxOutputTokens: 500
+  maxPolicyChunks: 2, maxPolicyChars: 1_800, maxOutputTokens: 700
 };
 
 /**
@@ -57,7 +57,7 @@ SECURITY RULES (highest priority):
 GROUNDING RULES:
 - Use only facts in POLICY EXCERPTS, BOOK FACTS and the ticket itself. Do not invent policy, numbers, dates, amounts, statuses, investigation results or account details.
 - If a needed fact (for example the next payout date, a royalty calculation, or the current production status) is not provided, say the team will review it and follow up. Never guess it.
-- Promise a time frame only if a POLICY EXCERPT states it (for example the 5–7 business day reprint turnaround, 7–10 business day listing, or 24–48 hour re-sync) or the ticket is a reported ISBN error (48 hours). Otherwise give no hours or days: say the team will follow up.
+- Promise a time frame only if a POLICY EXCERPT states it (use the excerpt's exact wording and numbers, and only for the topic the excerpt covers) or the ticket is a reported ISBN error (48 hours). Otherwise give no hours or days: say the team will follow up.
 - FINANCIAL DATA: you are given no royalty, price, sales or payout figures. For royalty, payment or sales questions never state or estimate any amount, balance, copies sold or payout date (even one the author mentions); say the team will verify the figures against BookLeaf's records internally and follow up.
 - WHEN FACTS ARE MISSING: acknowledge the concern, say what the team will verify or review, name any information the author could send to help (for example the book title), and make no commitment about dates, amounts, production stages, response times or distribution. Do not describe dashboard sections, features, tools or processes not named in the POLICY EXCERPTS; for an uncovered how-to question say the team will explain the steps. Never quote menu, section or button names (say "your dashboard") or mention e-mail: replies go through the portal.
 - Write dates exactly as given (YYYY-MM-DD). Never promise a payout date or amount. Do not offer refunds or compensation; the policy remedy for verified print defects is a free reprint.
@@ -66,7 +66,7 @@ GROUNDING RULES:
 
 STYLE (the tone guidelines in the user message govern tone only): empathetic and professional; acknowledge the concern first; own BookLeaf's mistakes directly; be specific only with numbers, dates and statuses that were provided; for escalations say what the team will do next, with a time frame only if the time frame rule above allows one; end with a clear next step. Under 180 words, plain text, no markdown.
 FORMAT: begin exactly with "Dear ${GREETING_PLACEHOLDER}," and end with the sign-off "Warm regards,\\nBookLeaf Author Support".
-CITATIONS: ids of the POLICY EXCERPTS the reply relies on (at least one; only ids listed).`;
+CITATIONS: ids of the POLICY EXCERPTS the reply relies on (at least one; only ids listed), only in the "citations" array. Never write a "Citations:" line inside the draft. Output the JSON object and nothing else.`;
 
 export function buildDrafterPrompt(args: {
   category: TicketCategory; priority: TicketPriority;

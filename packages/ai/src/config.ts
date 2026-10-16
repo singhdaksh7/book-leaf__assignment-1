@@ -44,7 +44,7 @@ const envSchema = z.object({
   AI_MAX_RETRIES: intInRange(2, 0, 5),
   AI_RETRY_BASE_DELAY_MS: intInRange(500, 0, 10_000),
   AI_RETRY_MAX_DELAY_MS: intInRange(4_000, 0, 60_000),
-  AI_MAX_OUTPUT_TOKENS: intInRange(400, 50, 4_000)
+  AI_MAX_OUTPUT_TOKENS: intInRange(800, 50, 4_000)
 });
 
 /**

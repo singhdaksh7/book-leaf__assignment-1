@@ -1,6 +1,7 @@
 import type { TicketCategory, TicketPriority } from "../categories.js";
 import { AiUnavailableError, type AiErrorCode } from "../errors.js";
 import { findUnsupportedClaims, type GroundingIssue } from "../grounding.js";
+import { isLiveMetadataUpdateRequest } from "../classifier/heuristics.js";
 import { KB_CHUNKS } from "../knowledge/chunks.js";
 import { createKnowledgeRetriever, type KnowledgeRetriever, type RetrievedChunk } from "../knowledge/retriever.js";
 import type { LlmProvider } from "../provider/types.js";
@@ -57,7 +58,8 @@ export function createResponseDrafter(options: ResponseDrafterOptions): Response
       const ticketText = `${input.subject}\n${input.description}`;
       const securityFlags = detectInjection([ticketText, ...history.map((h) => h.body)].join("\n"));
       const firstName = greetingName(input.authorContext);
-      const policy = selectPolicy(input, category, ticketText, retriever, limits);
+      const metadataTopic = !input.knowledge?.length && isLiveMetadataUpdateRequest(ticketText);
+      const policy = metadataTopic ? metadataPolicy() : selectPolicy(input, category, ticketText, retriever, limits);
       const policyIds = policy.map((c) => c.id);
 
       const fallback = (reason: AiErrorCode, groundingIssues: GroundingIssue[] = [], spent: UsageRecord | null = null): ResponseDraft => {
@@ -97,7 +99,13 @@ export function createResponseDrafter(options: ResponseDrafterOptions): Response
         // The only response timeline the source documents give for a reported issue: ISBN errors get a 48-hour timeline.
         ...(category === "ISBN_METADATA" ? [{ text: ISBN_ESCALATION_TIMELINE }] : [])
       ];
-      const issues = findUnsupportedClaims(parsed.draft.replace(GREETING_PLACEHOLDER, ""), sources, { strict: true });
+      // Time frames must come from the topic being answered (or the author's own words), not from any excerpt in the prompt.
+      const topical = policy.filter((c) => c.categories.includes(category));
+      const timelineText = [
+        ticketText, ...history.map((h) => h.body), JSON.stringify(bookFacts), ...(topical.length > 0 ? topical : policy).map((c) => c.content),
+        ...(category === "ISBN_METADATA" ? [ISBN_ESCALATION_TIMELINE] : [])
+      ].join("\n");
+      const issues = findUnsupportedClaims(parsed.draft.replace(GREETING_PLACEHOLDER, ""), sources, { strict: true, timelineText });
       if (issues.length > 0) return fallback("AI_UNGROUNDED_OUTPUT", issues, completion.usage);
 
       // Every draft carries at least one citation: the model's, else the category's own policy chunk (the top-ranked one).
@@ -108,6 +116,11 @@ export function createResponseDrafter(options: ResponseDrafterOptions): Response
       };
     }
   };
+}
+
+function metadataPolicy(): RetrievedChunk[] {
+  const c = KB_CHUNKS.find((k) => k.id === "kb.metadata-updates")!;
+  return [{ id: c.id, topic: c.topic, content: c.content, categories: c.categories, kind: c.kind, score: 0 }];
 }
 
 function selectPolicy(input: DraftTicketInput, category: TicketCategory, text: string, retriever: KnowledgeRetriever, limits: DrafterLimits): RetrievedChunk[] {

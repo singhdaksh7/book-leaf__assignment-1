@@ -260,7 +260,7 @@ describe("cost controls for drafting", () => {
     const history = Array.from({ length: 8 }, (_, i) => ({ author: "AUTHOR" as const, body: `msg${i} ` + "y".repeat(800) }));
     await createAiService({ provider }).analyzeTicket(input("royalty isbn print amazon typesetting", "royalty ".repeat(4000), { history }));
     const call = provider.calls[1]!;
-    expect(call.maxOutputTokens).toBe(500);
+    expect(call.maxOutputTokens).toBe(700);
     expect((call.user.match(/^\[kb\./gm) ?? []).length).toBeLessThanOrEqual(2);
     expect(call.user).not.toContain("msg5 ");
     expect(call.user.length).toBeLessThan(7000);

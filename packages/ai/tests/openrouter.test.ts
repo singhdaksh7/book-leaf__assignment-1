@@ -49,7 +49,7 @@ describe("OpenRouterProvider", () => {
     expect(url).toBe("https://openrouter.ai/api/v1/chat/completions");
     expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${FAKE_KEY}`);
     const body = JSON.parse(init.body as string);
-    expect(body).toMatchObject({ model: "nvidia/nemotron-3-super-120b-a12b:free", temperature: 0, max_tokens: 400, response_format: { type: "json_object" } });
+    expect(body).toMatchObject({ model: "nvidia/nemotron-3-super-120b-a12b:free", temperature: 0, max_tokens: 800, response_format: { type: "json_object" } });
     expect(res.content).toBe('{"a":1}');
     expect(res.usage).toMatchObject({ promptTokens: 400, completionTokens: 50, totalTokens: 450, costUsd: 0.00009, attempts: 1, fallbackUsed: false });
     expect(tracker.summary()).toMatchObject({ calls: 1, totalTokens: 450, costUsd: 0.00009 });
@@ -58,7 +58,7 @@ describe("OpenRouterProvider", () => {
   it("caps requested output tokens at the configured maximum", async () => {
     const f = mockFetch(jsonResponse(okEnvelope("{}")));
     await provider(f as unknown as typeof fetch).complete({ ...request, maxOutputTokens: 100_000 });
-    expect(JSON.parse(((f.mock.calls[0] as unknown) as [string, RequestInit])[1].body as string).max_tokens).toBe(400);
+    expect(JSON.parse(((f.mock.calls[0] as unknown) as [string, RequestInit])[1].body as string).max_tokens).toBe(800);
   });
 
   it("records unknown cost as null rather than zero", async () => {

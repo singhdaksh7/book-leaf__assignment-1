@@ -31,7 +31,7 @@ describe("prompt size limits (documented in README)", () => {
     const p = scriptedProvider(classifyContent(), draftContent("x"));
     await createAiService({ provider: p }).analyzeTicket({ ticketId: "t", subject: "Royalty", description: "royalty not received", authorContext: {} });
     expect(chars(p.calls[0]!)).toBeLessThan(3_500);
-    expect(chars(p.calls[1]!)).toBeLessThan(5_500);
+    expect(chars(p.calls[1]!)).toBeLessThan(5_700);
   });
   it("input fields are truncated at their caps and history is windowed", async () => {
     const p = scriptedProvider(classifyContent(), draftContent("x"));
