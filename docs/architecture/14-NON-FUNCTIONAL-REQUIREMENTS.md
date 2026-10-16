@@ -25,5 +25,5 @@ benchmark, and no benchmark was run.
 | Compatibility | Node 22 and 24; Chromium/Edge; viewports 1920, 1366, 768, 390, 360 px | clean-container test runs on both Node versions; 55 page/viewport checks with no overflow or console errors | Verified; Firefox/Safari not tested |
 | Accessibility | Not specified | Forms use labelled inputs and `role="alert"` messages; no automated accessibility audit was run | Not measured |
 | Observability | Structured JSON request logs with request ids; no ticket text, credentials or e-mails in logs | log scans of API, web, database, Traefik | Verified; no metrics, tracing or alerting |
-| Maintainability | npm workspaces, shared Zod contracts, 24-operation OpenAPI document matching the routes | cross-check script: 24/24 operations, 11/11 ERD entities, 96 columns, all enum values | Verified |
+| Maintainability | npm workspaces, shared Zod contracts, 25-operation OpenAPI document matching the routes | cross-check script: 24/24 operations, 11/11 ERD entities, 96 columns, all enum values | Verified |
 | Deployability | Reproducible container builds; deployed output identical to a clean build of the commit | compiled-output hash comparison (58 files) | Verified at `3b09980`; image tags do not encode a commit (BUG-007) |

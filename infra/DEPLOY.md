@@ -19,7 +19,10 @@ cd /opt/bookleaf/src/infra
 cp .env.example .env && chmod 600 .env   # fill POSTGRES_PASSWORD, SESSION_SECRET (openssl rand -hex 24/32), seed passwords
 docker compose up -d db
 docker compose --profile tools run --rm migrate
-docker compose --profile tools run --rm seed        # synthetic demo data only
+# Do NOT seed a production stack: the synthetic seed is refused when NODE_ENV=production (the image default).
+# Create the single admin instead (credentials from the environment, never on the command line):
+#   docker compose run --rm -e BOOKLEAF_ADMIN_EMAIL -e BOOKLEAF_ADMIN_PASSWORD -w /repo api npm run admin:ensure --workspace @bookleaf/db
+# Authors register themselves at /register.
 docker compose up -d api web
 ```
 
@@ -40,6 +43,14 @@ cd /opt/bookleaf/src/infra
 BOOKLEAF_TAG=<new-tag> docker compose --profile tools run --rm migrate
 BOOKLEAF_TAG=<new-tag> docker compose up -d api web
 ```
+
+## Production data hygiene
+
+* **Public registration** (`POST /auth/register`) is on by default and rate limited (`REGISTER_LIMIT_PER_IP_PER_HOUR` 5, `REGISTER_LIMIT_GLOBAL_PER_HOUR` 200). Behind Traefik set `TRUST_PROXY=1`, otherwise every client shares one IP and the per-IP allowance is shared too.
+* **The synthetic seed** (`docker compose --profile tools run --rm seed`) now refuses to run with `NODE_ENV=production` unless `BOOKLEAF_ALLOW_SYNTHETIC_SEED=yes-i-understand` is set. Use it only for a deliberate demo or staging stack.
+* **Removing synthetic records from a database**: [`docs/release/REGISTRATION_RELEASE_PLAN.md`](../docs/release/REGISTRATION_RELEASE_PLAN.md) section 7 (backup, dry run, owner approval, execute with a token). Never run it without a verified backup.
+* **Admin account**: [`docs/release/ADMIN_ACCOUNT.md`](../docs/release/ADMIN_ACCOUNT.md).
+* This release needs **no migration** (`migrate` is a no-op).
 
 ## Backup and restore
 

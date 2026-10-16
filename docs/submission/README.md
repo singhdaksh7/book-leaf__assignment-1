@@ -6,8 +6,8 @@ A support portal for BookLeaf Publishing. Authors raise tickets about their book
 | --- | --- |
 | Live site | https://bookleaf.77.37.45.177.sslip.io |
 | Source | private GitHub repository `singhdaksh7/book-leaf__assignment-1`, branch `integration/bookleaf-fullstack` (access on request; see the cover email) |
-| Live release | API and database `83184cd`, web `134f49b` |
-| Accounts | synthetic only: authors `synthetic.author1@example.test` … `synthetic.author10@example.test`, admin `admin@example.test`. Passwords are sent separately and are not in the repository |
+| Live release | API and database `83184cd`, web `134f49b` (the registration release described below is prepared on the branch but **not yet deployed**; see `docs/release/REGISTRATION_RELEASE_PLAN.md`) |
+| Accounts | Authors register themselves (*Create account* on the sign-in page; a new account starts empty). The single administrator is created by the owner on the server and cannot be created through the site; its login is sent separately and is not in the repository. Until the approved data cleanup runs, the live database still holds the older synthetic authors `synthetic.author1@example.test` … `synthetic.author10@example.test` |
 
 ## Stack
 
@@ -19,30 +19,31 @@ Three containers (web, api, db) sit behind Traefik. The browser loads static fil
 
 ## Features
 
-Author: sign in, dashboard, own books, create ticket, attachments, replies, live updates. Admin: filterable queue, status/category/priority changes, replies, internal notes, self-assignment, AI analysis and draft review, live updates. Security: HttpOnly session cookie, CSRF token, origin checks, rate limits, cross-author isolation (foreign ids answer 404), forced-download attachments. Operations: Docker Compose deployment, encrypted verified backups with a restore test and a daily cron, rollback images protected from the host prune job.
+Author: self-registration, sign in, dashboard, own books, create ticket, attachments, replies, live updates. Admin: filterable queue, status/category/priority changes, replies, internal notes, self-assignment, AI analysis and draft review, live updates. Security: HttpOnly session cookie, CSRF token, origin checks, rate limits, cross-author isolation (foreign ids answer 404), forced-download attachments. Operations: Docker Compose deployment, encrypted verified backups with a restore test and a daily cron, rollback images protected from the host prune job.
 
 ## Where to look
 
 | What | Where |
 | --- | --- |
 | **Software Design Document (PDF, 30 pages)** | `docs/SOFTWARE_DESIGN_DOCUMENT.pdf` (Markdown source: `docs/SOFTWARE_DESIGN_DOCUMENT.md`) |
-| Diagrams (46 editable Mermaid sources; SVG and PNG renders) | `docs/architecture/diagrams/` (`*.mmd`, `svg/`, `png/`); index in `docs/submission/ARCHITECTURE_INDEX.md` |
+| Diagrams (47 editable Mermaid sources; SVG and PNG renders) | `docs/architecture/diagrams/` (`*.mmd`, `svg/`, `png/`); index in `docs/submission/ARCHITECTURE_INDEX.md` |
 | ERD, data dictionary, DFD 0/1/2, UML, security, backup, AI modes | `docs/architecture/03`, `04`, `12`, `13` |
-| API (24 operations) | `docs/architecture/10-API-REFERENCE.md`, `openapi.yaml` |
+| API (25 operations) | `docs/architecture/10-API-REFERENCE.md`, `openapi.yaml` |
 | AI design and real-provider evidence | `docs/architecture/09-AI-ARCHITECTURE.md`, `docs/release/AI_REAL_PROVIDER.md` |
 | Deployment record, rollback, backups | `docs/release/DEPLOYMENT_RECORD.md`, `docs/operations/` |
 | Demo instructions | `docs/submission/DEMO_WALKTHROUGH.md` |
 | Test results | `docs/submission/TEST_RESULTS.md` |
 | Known limitations | `docs/submission/KNOWN_LIMITATIONS.md` |
 | Acceptance report | `docs/submission/FINAL_ACCEPTANCE_REPORT.md` |
+| Registration release plan, cleanup inventory, admin account | `docs/release/REGISTRATION_RELEASE_PLAN.md`, `FINAL_CLEANUP_INVENTORY.md`, `ADMIN_ACCOUNT.md` |
 
 ## Run it locally
 
 ```bash
 npm install && npm run build
-npm test                                   # AI (485), API (230, needs Postgres), web (53)
+npm test                                   # AI (485), API (292, needs Postgres), web (68)
 npm run test:scaffold && npm run test:infra
-cd apps/web && npx playwright test         # 30 browser E2E tests on a disposable stack (E2E_CHROMIUM_PATH for an installed Chrome)
+cd apps/web && npx playwright test         # 41 browser E2E tests on a disposable stack (E2E_CHROMIUM_PATH for an installed Chrome)
 ```
 
 Environment templates: `infra/.env.example`, `apps/api/.env.example`, `packages/ai/.env.example`. Real AI needs `OPENROUTER_API_KEY` in the git-ignored `infra/.env`.

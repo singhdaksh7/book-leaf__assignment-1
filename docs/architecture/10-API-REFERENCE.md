@@ -26,30 +26,31 @@ Shared object shapes are defined once in `packages/contracts/src/index.ts` (Zod)
 | - | --- | --- | --- | --- |
 | 1 | GET | `/healthz` | none | Health |
 | 2 | POST | `/api/v1/auth/login` | none | Authentication |
-| 3 | POST | `/api/v1/auth/logout` | any signed in | Authentication |
-| 4 | GET | `/api/v1/auth/me` | any signed in | Authentication |
-| 5 | GET | `/api/v1/author/books` | AUTHOR | Books |
-| 6 | GET | `/api/v1/author/books/:bookId` | AUTHOR | Books |
-| 7 | POST | `/api/v1/author/tickets` | AUTHOR | Tickets |
-| 8 | GET | `/api/v1/author/tickets` | AUTHOR | Tickets |
-| 9 | GET | `/api/v1/author/tickets/:ticketId` | AUTHOR | Tickets |
-| 10 | POST | `/api/v1/author/tickets/:ticketId/messages` | AUTHOR | Messages |
-| 11 | POST | `/api/v1/author/tickets/:ticketId/attachments` | AUTHOR | Attachments |
-| 12 | GET | `/api/v1/author/tickets/:ticketId/attachments` | AUTHOR | Attachments |
-| 13 | GET | `/api/v1/author/tickets/:ticketId/attachments/:attachmentId` | AUTHOR | Attachments |
-| 14 | GET | `/api/v1/admin/tickets` | ADMIN | Admin / Tickets |
-| 15 | GET | `/api/v1/admin/tickets/:ticketId` | ADMIN | Admin / Tickets |
-| 16 | PATCH | `/api/v1/admin/tickets/:ticketId` | ADMIN | Admin / Tickets |
-| 17 | POST | `/api/v1/admin/tickets/:ticketId/replies` | ADMIN | Messages |
-| 18 | POST | `/api/v1/admin/tickets/:ticketId/internal-notes` | ADMIN | Admin |
-| 19 | PUT | `/api/v1/admin/tickets/:ticketId/assignment` | ADMIN | Admin |
-| 20 | GET | `/api/v1/admin/tickets/:ticketId/ai-analysis` | ADMIN | AI |
-| 21 | POST | `/api/v1/admin/tickets/:ticketId/ai-analysis` | ADMIN | AI |
-| 22 | GET | `/api/v1/admin/tickets/:ticketId/attachments` | ADMIN | Attachments |
-| 23 | GET | `/api/v1/admin/tickets/:ticketId/attachments/:attachmentId` | ADMIN | Attachments |
-| 24 | GET | `/api/v1/events/tickets` | any signed in | Events (SSE) |
+| 3 | POST | `/api/v1/auth/register` | none | Authentication |
+| 4 | POST | `/api/v1/auth/logout` | any signed in | Authentication |
+| 5 | GET | `/api/v1/auth/me` | any signed in | Authentication |
+| 6 | GET | `/api/v1/author/books` | AUTHOR | Books |
+| 7 | GET | `/api/v1/author/books/:bookId` | AUTHOR | Books |
+| 8 | POST | `/api/v1/author/tickets` | AUTHOR | Tickets |
+| 9 | GET | `/api/v1/author/tickets` | AUTHOR | Tickets |
+| 10 | GET | `/api/v1/author/tickets/:ticketId` | AUTHOR | Tickets |
+| 11 | POST | `/api/v1/author/tickets/:ticketId/messages` | AUTHOR | Messages |
+| 12 | POST | `/api/v1/author/tickets/:ticketId/attachments` | AUTHOR | Attachments |
+| 13 | GET | `/api/v1/author/tickets/:ticketId/attachments` | AUTHOR | Attachments |
+| 14 | GET | `/api/v1/author/tickets/:ticketId/attachments/:attachmentId` | AUTHOR | Attachments |
+| 15 | GET | `/api/v1/admin/tickets` | ADMIN | Admin / Tickets |
+| 16 | GET | `/api/v1/admin/tickets/:ticketId` | ADMIN | Admin / Tickets |
+| 17 | PATCH | `/api/v1/admin/tickets/:ticketId` | ADMIN | Admin / Tickets |
+| 18 | POST | `/api/v1/admin/tickets/:ticketId/replies` | ADMIN | Messages |
+| 19 | POST | `/api/v1/admin/tickets/:ticketId/internal-notes` | ADMIN | Admin |
+| 20 | PUT | `/api/v1/admin/tickets/:ticketId/assignment` | ADMIN | Admin |
+| 21 | GET | `/api/v1/admin/tickets/:ticketId/ai-analysis` | ADMIN | AI |
+| 22 | POST | `/api/v1/admin/tickets/:ticketId/ai-analysis` | ADMIN | AI |
+| 23 | GET | `/api/v1/admin/tickets/:ticketId/attachments` | ADMIN | Attachments |
+| 24 | GET | `/api/v1/admin/tickets/:ticketId/attachments/:attachmentId` | ADMIN | Attachments |
+| 25 | GET | `/api/v1/events/tickets` | any signed in | Events (SSE) |
 
-By domain: Health 1, Authentication 3, Books 2, Author tickets 3 (#7–9), Admin tickets 3 (#14–16), Messages 2 (#10, #17), Admin operations 2 (#18–19), AI 2 (#20–21), Attachments 5 (#11–13, #22–23), Events 1 = 24.
+By domain: Health 1, Authentication 4, Books 2, Author tickets 3 (#8–10), Admin tickets 3 (#15–17), Messages 2 (#11, #18), Admin operations 2 (#19–20), AI 2 (#21–22), Attachments 5 (#12–14, #23–24), Events 1 = 25.
 
 ## 10.3 Health
 
@@ -66,6 +67,14 @@ Liveness only. Role: none. Response `200 {"status":"ok"}`. Mounted before authen
 * `200 { user: CurrentUser }` and two `Set-Cookie` headers (`bookleaf_session`, `XSRF-TOKEN`).
 * Errors: `400` invalid body; `401` `Invalid email or password` (identical for unknown e-mail and wrong password); `403` `Request origin is not allowed` (Origin ≠ `WEB_ORIGIN`, or `Sec-Fetch-Site: cross-site`), or invalid CSRF token if a stale session cookie is also sent; `429` after 10 failures per (IP, account) or 30 per IP in 15 minutes, with `Retry-After`.
 * Security: Argon2id verification with timing equalisation; origin check substitutes for CSRF here; session token stored only as a SHA-256 hash.
+
+### `POST /api/v1/auth/register`
+
+* Purpose: public author self-registration. Role: none (anonymous). The created account is always `AUTHOR`; the caller is signed in (session cookies as for login).
+* Body (strict, unknown keys rejected): `{ name: string(2–100, no control characters or <>), email: string(email, ≤254, trimmed and lower-cased), password: string(12–128 with a lowercase letter, an uppercase letter and a digit; not a very common password; not containing the e-mail name), confirmPassword: string(must equal password) }`.
+* `201 { user: CurrentUser }` (`role: "AUTHOR"`, `authorProfile.externalAuthorId` starting `WEB-`, empty `phone` and `city`) and two `Set-Cookie` headers.
+* Errors: `400` invalid body or any extra field such as `role`/`isAdmin` (details name the field path and a generic message, never the submitted value); `403` Origin not allowed, or the caller is already signed in; `409 CONFLICT` "We could not create an account with these details. If you already have an account, sign in instead." (existing address in any casing, or a concurrent duplicate; no cookie is set); `429` after `REGISTER_LIMIT_PER_IP_PER_HOUR` (default 5) attempts per IP or `REGISTER_LIMIT_GLOBAL_PER_HOUR` (default 200) overall in an hour, with `Retry-After`.
+* Security: see §7.1a. No password hash, token hash or secret is ever returned.
 
 ### `POST /api/v1/auth/logout`
 
@@ -172,4 +181,4 @@ No body. Starts or joins an analysis. `202 { analysis }` while the returned atte
 
 ## 10.12 OpenAPI specification and what is verified
 
-[`openapi.yaml`](openapi.yaml) (OpenAPI 3.1) describes the 24 operations above. Method, path, role, request-body schemas and success/error status codes were taken from the route handlers and the Zod contracts. Items **not verifiable from source alone**, marked `x-unverified` in the file where relevant: the exact set of headers Helmet adds to API responses; the precise `details` array for validation errors (paths and Zod messages vary); `Content-Length` on streaming responses; Traefik-added headers (HSTS) which are outside the application. The specification was parsed and validated with a local OpenAPI validator as described in [15 – Testing Architecture](15-TESTING-ARCHITECTURE.md) §15.8 (see the result recorded there).
+[`openapi.yaml`](openapi.yaml) (OpenAPI 3.1) describes the 25 operations above. Method, path, role, request-body schemas and success/error status codes were taken from the route handlers and the Zod contracts. Items **not verifiable from source alone**, marked `x-unverified` in the file where relevant: the exact set of headers Helmet adds to API responses; the precise `details` array for validation errors (paths and Zod messages vary); `Content-Length` on streaming responses; Traefik-added headers (HSTS) which are outside the application. The specification was parsed and validated with a local OpenAPI validator as described in [15 – Testing Architecture](15-TESTING-ARCHITECTURE.md) §15.8 (see the result recorded there).

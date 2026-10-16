@@ -23,3 +23,7 @@
 - **Dependency advisories**: 3 high in the Prisma CLI chain (`deepmerge-ts`), unreachable at runtime; see [Security review](SECURITY_REVIEW.md).
 - **Engine warnings**: some dependencies declare Node `^22.22.2 || ^24.15.0 || >=26`; older Node only warns.
 - **Vite dev server has no `/api` proxy**; set `VITE_API_BASE_URL` (CORS is configured for `WEB_ORIGIN`).
+- **Registration reveals whether an address is registered.** A sign-up form cannot hide this without e-mail verification, which is not implemented; the generic 409 text, equal timing and the per-IP/global allowance only limit how fast it can be probed. New accounts are not verified people or mailboxes.
+- **Self-registered authors start with no books.** There is no admin screen or API to link books to an account yet (a database operation), so a new author can raise tickets but sees an empty library. Their profile has empty phone and city (the admin UI shows "Not provided") and an `externalAuthorId` of the form `WEB-<hex>`.
+- **Registration throttling is in memory per process** (like login) and relies on `TRUST_PROXY` to see real client IPs.
+- **Synthetic records remain in production until the separately approved cleanup is run**, and registration is not live until the release in `docs/release/REGISTRATION_RELEASE_PLAN.md` is deployed. The cleanup never deletes audit history (the database forbids it), so audit rows about the removed synthetic tickets stay.

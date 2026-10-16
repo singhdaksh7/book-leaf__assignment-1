@@ -16,8 +16,17 @@ Real environments inject variables directly. For local development copy `apps/ap
 | `TRUST_PROXY` | `false` | `true` or a hop count (for example `1`) behind a reverse proxy, so `req.ip` (rate limits) and `Secure` cookies are correct. |
 | `LOGIN_MAX_FAILURES` / `LOGIN_FAILURE_WINDOW_MINUTES` | `10` / `15` | In-memory per process. |
 | `TICKET_CREATE_LIMIT_PER_HOUR` / `AUTHOR_REPLY_LIMIT_PER_HOUR` | `30` / `60` | In-memory per process. |
+| `REGISTER_LIMIT_PER_IP_PER_HOUR` / `REGISTER_LIMIT_GLOBAL_PER_HOUR` | `5` / `200` | Public registration attempts (valid or not) per client IP and across all clients per hour. In memory per process. Needs `TRUST_PROXY` behind a proxy. |
 | `ATTACHMENT_DIR` | `var/attachments` | Local disk, random keys, outside any served path. Back it up with the database. |
 | `ATTACHMENT_MAX_BYTES` / `ATTACHMENT_MAX_PER_TICKET` | `5242880` / `5` | Max 25 MiB / 50. |
+
+## Database tools (`packages/db`, run from the repository root or the API image's `/repo`)
+
+| Variable | Used by | Notes |
+| --- | --- | --- |
+| `BOOKLEAF_ADMIN_EMAIL` / `BOOKLEAF_ADMIN_PASSWORD` | `npm run admin:ensure` | Required; password 12 to 128 characters with lowercase, uppercase and a digit. Read from the environment only. No defaults exist. |
+| `BOOKLEAF_ALLOW_SYNTHETIC_SEED` | `seed`, `seed:synthetic` | Must equal `yes-i-understand` to seed synthetic accounts when `NODE_ENV=production`; otherwise refused. |
+| `ATTACHMENT_DIR` | `npm run cleanup:synthetic` | Where attachment files live (`/data/attachments` in the API image); files of removed rows are deleted after the database commit. |
 
 ## AI (read by `@bookleaf/ai` through the API; see `packages/ai/README.md`)
 

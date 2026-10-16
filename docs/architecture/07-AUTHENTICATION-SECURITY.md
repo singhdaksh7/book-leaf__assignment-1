@@ -45,6 +45,46 @@ Facts, all from `auth/routes.ts`, `auth/sessions.ts`, `auth/middleware.ts`:
 * **Cookies:** names `bookleaf_session` (HttpOnly) and `XSRF-TOKEN` (readable by JavaScript by design so the SPA can echo it). Both: `Secure` when `NODE_ENV=production`, `SameSite=Lax`, `Path=/`, `Expires` = session expiry. The release audit confirmed these flags on the live HTTPS site.
 * **Login throttling:** 10 failures per (IP, account) and 30 per IP in 15 minutes, in memory (single instance), answered with 429 and `Retry-After` (audit: observed `Retry-After: 900`).
 
+## 7.1a Author self-registration
+
+Anyone can create an **AUTHOR** account at `/register`. There is no public way to create or promote an administrator: the role is not part of the request contract, the server writes the literal `AUTHOR`, and the only way to create an ADMIN is the server-side admin tool (`npm run admin:ensure --workspace @bookleaf/db`, see `docs/release/ADMIN_ACCOUNT.md`).
+
+```mermaid
+%% file: auth-registration-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser (SPA /register)
+    participant A as Express (authenticate, csrfProtection)
+    participant R as Auth router POST /auth/register
+    participant DB as PostgreSQL
+
+    B->>A: POST /api/v1/auth/register {name, email, password, confirmPassword}, Origin: https://host
+    A->>R: anonymous request passes through (no session, so no CSRF token yet)
+    Note over R: 1) Origin must equal WEB_ORIGIN, signed-in callers get 403
+    Note over R: 2) allowance per IP and global, every attempt counts, else 429
+    Note over R: 3) strict Zod schema: unknown keys such as role are 400, then password policy
+    Note over R: 4) Argon2id hash BEFORE the insert (similar timing either way)
+    R->>DB: one transaction: INSERT User(role AUTHOR) with nested AuthorProfile(externalAuthorId WEB-random) and an AuditLog row user.registered
+    alt unique violation on User.email (existing account or a concurrent twin)
+        DB-->>R: P2002 (target email)
+        R-->>B: 409 CONFLICT generic message, no session, no Set-Cookie
+    else created
+        R->>DB: INSERT Session (as for login)
+        R-->>B: 201 {user}, Set-Cookie bookleaf_session (HttpOnly) and XSRF-TOKEN
+    end
+```
+
+Controls, all in `auth/routes.ts` and `packages/contracts`:
+
+* **Role fixed server-side.** `registerRequestSchema` is `.strict()`: an extra key is a `400`, never silently dropped; the handler hard-codes `role: "AUTHOR"`.
+* **Password policy** (shared by the form and the server): 12 to 128 characters with a lowercase letter, an uppercase letter and a digit; a short list of very common passwords and passwords containing the e-mail name are refused. Hashing uses the same Argon2id parameters as login.
+* **No check-then-insert race.** The unique index on `User.email` is the only duplicate guard; eight concurrent registrations for one address yield exactly one `201` and seven `409`s (test). A collision on the random external id is retried, never reported as a duplicate.
+* **Enumeration.** The duplicate answer is one fixed, generic sentence and the same `409` for any casing or whitespace; the Argon2 work happens before the insert, so timing is similar. Residual risk: an attacker can still learn that an address is registered by receiving `409` instead of `201` (a sign-up form cannot hide this without e-mail verification, which is not implemented); the per-IP and global allowance bounds how fast it can be probed.
+* **Rate limits** (in memory, per process, like login): `REGISTER_LIMIT_PER_IP_PER_HOUR` (default 5) and `REGISTER_LIMIT_GLOBAL_PER_HOUR` (default 200). Invalid attempts consume the allowance; registration does not consume the login allowance.
+* **Profile data.** A self-registered author has no phone or city, so those profile columns hold an empty string (the admin UI shows "Not provided"), `externalAuthorId` is `WEB-` plus 16 random hex characters, and the author starts with no books and no tickets. Books are not linked automatically; see the limitations.
+* **Audit.** One `user.registered` row (actor = the new user, `after = {role: "AUTHOR"}`); no password material.
+* **CSRF.** Like login, there is no session yet, so the Origin check is the guard; every later state-changing call uses the normal session-bound token.
+
 ## 7.2 Authenticated API request and role-based authorisation
 
 ```mermaid
@@ -119,7 +159,7 @@ sequenceDiagram
 
 * The CSRF token is **stateless and bound to the session**: `HMAC(SESSION_SECRET, "csrf:" + sessionId)`. It dies with the session and cannot be derived without the server secret. It is re-issued by `GET /auth/me` so a client that lost the cookie can recover.
 * This is a double-submit pattern plus an Origin check. `SameSite=Lax` cookies add a third layer. CORS allows only `WEB_ORIGIN` (credentials on); the audit confirmed a foreign origin gets no CORS allow header.
-* **Login CSRF:** there is no session yet, so `POST /auth/login` is protected by `assertTrustedOrigin` alone. Edge case (from reading the middleware order): `csrfProtection` runs *before* the auth router, so a login request that still carries a valid old session cookie must also carry a valid CSRF token or it is rejected with 403.
+* **Login and registration CSRF:** there is no session yet, so `POST /auth/login` and `POST /auth/register` are protected by `assertTrustedOrigin` alone. Edge case (from reading the middleware order): `csrfProtection` runs *before* the auth router, so a login request that still carries a valid old session cookie must also carry a valid CSRF token or it is rejected with 403.
 * **Known gap (documented):** a request with **no** `Origin` header is accepted (non-browser clients send none); for authenticated mutating calls the CSRF token is still required, but the login endpoint then relies on the absence of cross-site context only.
 
 ## 7.4 Session validation, refresh and revocation

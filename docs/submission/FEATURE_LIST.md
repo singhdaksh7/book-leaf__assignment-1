@@ -11,3 +11,9 @@
 **Operations:** Docker Compose stack (db, api, web) behind a shared Traefik; encrypted verified backups with restore test (installed and scheduled on the VPS; restore proven in isolation; no off-host copy).
 
 **Not implemented:** password reset, e-mail notifications, file deletion, server-side search, off-host backup.
+
+## Added in the registration release (implemented and tested locally; not yet deployed)
+
+* Public author self-registration with a responsive, keyboard-accessible form (inline validation, live password checklist, show/hide password, duplicate handling, loading and success states).
+* Fixed administrator model: no public admin creation or promotion; server-side admin tool; no default credentials.
+* Production data hygiene: seed guard, dry-run-by-default synthetic-data cleanup tool, professional empty states for new accounts.

@@ -15,6 +15,7 @@ Use `400 VALIDATION_ERROR`, `401 UNAUTHENTICATED`, `403 FORBIDDEN`, `404 NOT_FOU
 | Method | Path | Access | Contract |
 | --- | --- | --- | --- |
 | POST | `/auth/login` | Public | `loginRequestSchema` -> 200 `loginResponseSchema`; sets session cookie. |
+| POST | `/auth/register` | Public | `registerRequestSchema` (strict; no role field) -> 201 `registerResponseSchema`; creates an AUTHOR and sets session cookies. 409 for an existing email, 429 when rate limited. |
 | POST | `/auth/logout` | Authenticated | Revokes session; 204 with no body. |
 | GET | `/auth/me` | Authenticated | 200 `meResponseSchema`. |
 | GET | `/author/books` | Author | 200 `bookListResponseSchema`; caller's books, paginated. |

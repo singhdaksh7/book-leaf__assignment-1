@@ -54,10 +54,10 @@ erDiagram
     AuthorProfile {
         string id PK "cuid"
         string userId FK, UK "1:1 to User"
-        string externalAuthorId UK "source dataset id"
+        string externalAuthorId UK "dataset id, or WEB-hex if self-registered"
         string name "indexed"
-        string phone
-        string city
+        string phone "empty if self-registered"
+        string city "empty if self-registered"
         date joinedDate
     }
     Book {

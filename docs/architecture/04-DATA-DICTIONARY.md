@@ -32,11 +32,11 @@ Relations: 0..1 `AuthorProfile`; many `Session`, assigned `Ticket`s, `TicketMess
 | --- | --- | --- | --- | --- |
 | `id` | text | no | **PK** | The author's tenant key used in every author-scoped query |
 | `userId` | text | no | **FK → User.id**, **UK**, `ON DELETE CASCADE` | One-to-one with `User` |
-| `externalAuthorId` | text | no | **UK** | Identifier from the source dataset (`author_id`) |
+| `externalAuthorId` | text | no | **UK** | Identifier from the source dataset (`author_id`, e.g. `SYN-A001`), or `WEB-` plus 16 random hex characters for an author who registered through the portal |
 | `name` | text | no | index `(name)` | Display name; also the only author attribute sent to the AI (greeting) |
-| `phone` | text | no | – | Contact detail; never sent to the AI provider |
-| `city` | text | no | – | Never sent to the AI provider |
-| `joinedDate` | date | no | – | |
+| `phone` | text | no | – | Contact detail; never sent to the AI provider. Empty string for a self-registered author (the UI shows "Not provided") |
+| `city` | text | no | – | Never sent to the AI provider. Empty string for a self-registered author |
+| `joinedDate` | date | no | – | Source value, or the registration date (UTC) for a self-registered author |
 
 ## 4.4 `Book`
 

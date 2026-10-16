@@ -70,6 +70,35 @@ paths:
         "401": { $ref: "#/components/responses/Unauthenticated" }
         "403": { $ref: "#/components/responses/Forbidden" }
         "429": { $ref: "#/components/responses/RateLimited" }
+  /api/v1/auth/register:
+    post:
+      tags: [Authentication]
+      operationId: register
+      summary: Create an author account and sign in
+      description: >-
+        Public self-registration. The role is always AUTHOR and cannot be supplied: the body schema rejects any additional
+        property. Origin must equal WEB_ORIGIN. Attempts are limited per IP and globally (REGISTER_LIMIT_PER_IP_PER_HOUR,
+        REGISTER_LIMIT_GLOBAL_PER_HOUR). An existing address answers a generic 409.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
+      responses:
+        "201":
+          description: Account created and signed in. Sets cookies bookleaf_session (HttpOnly) and XSRF-TOKEN.
+          headers:
+            Set-Cookie:
+              description: Two Set-Cookie headers (session token, CSRF token), Secure in production, SameSite=Lax, Path=/.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthResponse" }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "429": { $ref: "#/components/responses/RateLimited" }
   /api/v1/auth/logout:
     post:
       tags: [Authentication]
@@ -599,6 +628,19 @@ components:
       properties:
         email: { type: string, format: email }
         password: { type: string, minLength: 1 }
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [name, email, password, confirmPassword]
+      properties:
+        name: { type: string, minLength: 2, maxLength: 100 }
+        email: { type: string, format: email, maxLength: 254 }
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: Must contain a lowercase letter, an uppercase letter and a digit; very common passwords and passwords containing the e-mail name are rejected.
+        confirmPassword: { type: string, description: Must equal password. }
     AuthorProfile:
       type: object
       required: [id, userId, externalAuthorId, name, phone, city, joinedDate]

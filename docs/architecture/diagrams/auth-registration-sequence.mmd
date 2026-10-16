@@ -1,0 +1,22 @@
+%% file: auth-registration-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser (SPA /register)
+    participant A as Express (authenticate, csrfProtection)
+    participant R as Auth router POST /auth/register
+    participant DB as PostgreSQL
+
+    B->>A: POST /api/v1/auth/register {name, email, password, confirmPassword}, Origin: https://host
+    A->>R: anonymous request passes through (no session, so no CSRF token yet)
+    Note over R: 1) Origin must equal WEB_ORIGIN, signed-in callers get 403
+    Note over R: 2) allowance per IP and global, every attempt counts, else 429
+    Note over R: 3) strict Zod schema: unknown keys such as role are 400, then password policy
+    Note over R: 4) Argon2id hash BEFORE the insert (similar timing either way)
+    R->>DB: one transaction: INSERT User(role AUTHOR) with nested AuthorProfile(externalAuthorId WEB-random) and an AuditLog row user.registered
+    alt unique violation on User.email (existing account or a concurrent twin)
+        DB-->>R: P2002 (target email)
+        R-->>B: 409 CONFLICT generic message, no session, no Set-Cookie
+    else created
+        R->>DB: INSERT Session (as for login)
+        R-->>B: 201 {user}, Set-Cookie bookleaf_session (HttpOnly) and XSRF-TOKEN
+    end

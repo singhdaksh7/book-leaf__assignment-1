@@ -4,11 +4,11 @@
 
 | | |
 | --- | --- |
-| Version | 1.0 (matches branch `integration/bookleaf-fullstack`) |
+| Version | 1.1: adds author self-registration, the fixed-admin model, the production seed guard and the synthetic-data cleanup tool (matches branch `integration/bookleaf-fullstack`) |
 | Date | 2026-10-16 |
-| Status | Describes the implemented application. Items not implemented or not verified are stated as such |
+| Status | Describes the implemented application. Items not implemented or not verified are stated as such. The registration release is implemented and tested locally but **not yet deployed**; production still runs the previous release |
 | Repository | private GitHub repository `singhdaksh7/book-leaf__assignment-1` |
-| Staging | https://bookleaf.77.37.45.177.sslip.io (runs release `83184cd` with the real OpenRouter provider; the free daily AI quota was exhausted during acceptance, see §16 and §21) |
+| Staging | https://bookleaf.77.37.45.177.sslip.io (runs API `83184cd` and web `134f49b` with the real OpenRouter provider; the free daily AI quota was exhausted during acceptance, see §16 and §21; it does not yet have self-registration, and its database still holds only synthetic records) |
 
 **Reading note.** Every statement describes code that exists in the repository. Where a capability was tested only with mocks, or not tested, the text says so. Detailed per-component documents are in `docs/architecture/`; this document summarises them and links the diagrams.
 
@@ -36,6 +36,7 @@ Author questions (royalties, ISBNs, print quality, distribution, production stat
 | ID | Requirement | Status |
 | --- | --- | --- |
 | F1 | Sign in and out with e-mail and password; roles AUTHOR and ADMIN | Implemented |
+| F1a | Authors create their own account (public self-registration). Administrators are never self-registered: the single admin is created and managed by a server-side tool | Implemented |
 | F2 | Author lists and views only their own books | Implemented |
 | F3 | Author creates a ticket for one of their books (subject, description) | Implemented |
 | F4 | Author attaches files to a ticket and downloads them | Implemented |
@@ -168,6 +169,10 @@ See §6.3. The domain classes mirror the Prisma models; there are no inheritance
 
 ![Login](architecture/diagrams/png/auth-sequence.png)
 
+### 12.4 Author self-registration
+
+![Registration](architecture/diagrams/png/auth-registration-sequence.png)
+
 ## 13. Ticket state transitions
 
 Any non-CLOSED status can move to any other status through the admin `PATCH`. `CLOSED` is terminal: status, category, priority, replies, attachments, assignment and AI analysis answer `409`. Internal notes are still accepted on a closed ticket. Replies and notes never change status.
@@ -182,18 +187,20 @@ AI attempt states: PENDING, then exactly one of COMPLETED or FAILED. An attempt 
 
 Model: server-side sessions with an opaque random cookie (`bookleaf_session`, HttpOnly, SameSite=Lax, Secure in production); only the SHA-256 of the token is stored. Passwords use Argon2id; unknown e-mails are verified against a dummy hash so timing and messages do not reveal accounts. A second cookie carries a session-bound CSRF token (an HMAC of the session id with `SESSION_SECRET`) that every state-changing request must echo in `X-CSRF-Token`, together with a trusted `Origin`. Login is throttled per IP and account. There is no JWT, OAuth or API-key authentication.
 
+**Registration and the fixed admin role.** Authors register themselves at `/register` (`POST /auth/register`, §12.4). The endpoint accepts exactly four fields (name, e-mail, password, confirmation); any other field, including `role`, is rejected, and the server always stores `AUTHOR`. The password policy (12 to 128 characters with lowercase, uppercase and a digit, no very common passwords, no e-mail name) is shared by the form and the server, and passwords are hashed with the same Argon2id settings as login. Duplicates are decided only by the unique index on `User.email`, so concurrent registrations cannot create two accounts; the answer for an existing address is one generic `409`. Attempts are limited per IP (5 per hour) and globally (200 per hour). There is exactly one administrator, created and rotated only through the server-side tool `npm run admin:ensure` (credentials from the environment, never from a request, no default password, never promoting an author); no public API creates or modifies an admin.
+
 Authorisation is role-based (`requireAuthor`, `requireRole(ADMIN)`) plus ownership scoping: an author's id comes only from the session and is part of every author query; a foreign resource returns the same `404` as a missing one. Admin-only data (internal notes, AI analysis) exists only on `/admin` routes.
 
 ![Request authorisation](architecture/diagrams/png/auth-request-rbac-sequence.png)
 
 ## 15. API architecture
 
-Express application with a fixed middleware order (request id, security headers, JSON body limit 100 kB, authentication, CSRF, rate limits, validation, role guards, handlers) and Zod contracts shared with the frontend. Responses are JSON with `Cache-Control: no-store`; errors use one envelope with stable codes. There are **24 operations**: 23 under `/api/v1` and `GET /healthz`.
+Express application with a fixed middleware order (request id, security headers, JSON body limit 100 kB, authentication, CSRF, rate limits, validation, role guards, handlers) and Zod contracts shared with the frontend. Responses are JSON with `Cache-Control: no-store`; errors use one envelope with stable codes. There are **25 operations**: 24 under `/api/v1` and `GET /healthz`.
 
 | Domain | Operations |
 | --- | --- |
 | Health | `GET /healthz` (liveness only) |
-| Authentication | `POST /auth/login`, `POST /auth/logout`, `GET /auth/me` |
+| Authentication | `POST /auth/login`, `POST /auth/register`, `POST /auth/logout`, `GET /auth/me` |
 | Author books | `GET /author/books`, `GET /author/books/:bookId` |
 | Author tickets | `POST /author/tickets`, `GET /author/tickets`, `GET /author/tickets/:ticketId`, `POST …/messages` |
 | Author attachments | `POST`, `GET` list, `GET` one on `/author/tickets/:ticketId/attachments` |
@@ -258,11 +265,13 @@ Authors upload files to their own tickets (client and server check: non-empty, a
 
 ## 20. Security design
 
-Layers: host firewall (22, 80, 443) → Traefik TLS and HSTS → API origin check → session authentication → CSRF → rate limits (login; ticket creation 30 per hour per user; replies) → Zod validation (unknown query keys rejected) → role guard → ownership scoping → database constraints and triggers. Secrets exist only in server environment files; the API refuses placeholder secrets in production; the OpenRouter key never reaches the browser, logs, database rows or API responses (verified by tests with a fake key).
+Layers: host firewall (22, 80, 443) → Traefik TLS and HSTS → API origin check → session authentication → CSRF → rate limits (login; registration; ticket creation 30 per hour per user; replies) → Zod validation (unknown query keys rejected) → role guard → ownership scoping → database constraints and triggers. Secrets exist only in server environment files; the API refuses placeholder secrets in production; the OpenRouter key never reaches the browser, logs, database rows or API responses (verified by tests with a fake key).
 
 ![Security architecture](architecture/diagrams/png/security-architecture.png)
 
-Residual risks: free AI endpoints may retain prompts (only synthetic data was used in testing); login throttling is in memory; one API instance.
+Residual risks: free AI endpoints may retain prompts (only synthetic data was used in testing); login and registration throttling is in memory; one API instance; registration reveals whether an address is already registered (no e-mail verification); self-registered authors are not verified people, so book linkage must stay a manual administrative decision.
+
+Data hygiene controls: the production seed refuses synthetic accounts (`NODE_ENV=production` without an explicit acknowledgement), and a dry-run-by-default cleanup tool removes only provably synthetic records, never the admin and never audit history (`docs/release/FINAL_CLEANUP_INVENTORY.md`).
 
 ## 21. Docker and VPS deployment
 
@@ -283,9 +292,9 @@ Deployment findings to act on: a host cron prunes unused Docker images older tha
 | Layer | Tool | Result (this branch) |
 | --- | --- | --- |
 | AI package | Vitest | 485 passed |
-| API with real PostgreSQL | Vitest + Supertest | 230 passed, 0 skipped |
-| Frontend | Vitest + Testing Library | 50 passed |
-| Browser E2E | Playwright (Chrome) on a disposable stack with a mock provider | 30 passed |
+| API with real PostgreSQL | Vitest + Supertest | 292 passed, 0 skipped (42 registration, 20 cleanup/seed-guard/admin-tool) |
+| Frontend | Vitest + Testing Library | 68 passed (15 registration form) |
+| Browser E2E | Playwright (Chrome) on a disposable stack with a mock provider | 41 passed (11 registration: desktop, 375 px mobile, keyboard) |
 | Scaffold / infra | `node --test` | 9 / 12 passed |
 | Backup scripts | manual, disposable containers | passed (see §22) |
 | Real OpenRouter | `tests/live/ai-real.mjs`, `ai-real-failures.mjs` | classification 6/6; drafts accepted 12/13 on the final prompt; failure scenarios passed (see §16) |
@@ -303,7 +312,9 @@ Regression tests were added for each fix made in this release (whitespace login 
 * Backups are installed and scheduled, with a restore proven in isolation, but there is no off-host copy, so disaster recovery is incomplete; the first scheduled run is not yet observed.
 * Host risks: image-prune cron, pending reboot and updates, deployed tree not a git checkout.
 * Deferred defects: duplicate tickets on concurrent identical submissions; admin search covers the current page only; health endpoint is liveness-only; internal-note/assignment deletion not trigger-protected (needs a migration).
-* Not implemented: password reset, e-mail notifications, attachment deletion, server-side search.
+* Not implemented: password reset, e-mail notifications, e-mail verification of new accounts, attachment deletion, server-side search.
+* Self-registered authors start with no books: there is no admin screen or API to link books to an account yet (done by a database operation), and registration reveals whether an address is already registered.
+* Registration is verified by automated tests only; it is not live until the release in `docs/release/REGISTRATION_RELEASE_PLAN.md` is deployed, and the production database still holds the synthetic records until the separately approved cleanup is run.
 * Single API instance: login throttling, event hub and AI single-flight are per process.
 
 ## 25. Conclusion

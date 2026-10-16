@@ -1,6 +1,6 @@
 # BookLeaf Author Support Portal
 
-A full-stack author support portal: authors browse their books and raise support tickets (with attachments and replies); admins triage a queue, assign tickets, add private notes, review AI-generated drafts and send replies. AI never sends anything: every draft is reviewed and sent by an admin.
+A full-stack author support portal: authors register themselves, browse their books and raise support tickets (with attachments and replies); admins triage a queue, assign tickets, add private notes, review AI-generated drafts and send replies. AI never sends anything: every draft is reviewed and sent by an admin.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ npm-workspace monorepo: TypeScript, React/Vite, Express, PostgreSQL/Prisma, Zod.
 | `apps/web` (`@bookleaf/web`) | Author and admin browser UI (React, Vite). Talks to the API through a typed client; mock mode is for offline development only. |
 | `apps/api` (`@bookleaf/api`) | Express REST API, cookie sessions + CSRF, attachments on local disk, Server-Sent Events, AI attempt orchestration. |
 | `packages/contracts` | Zod schemas and inferred types shared by API and web (authoritative wire format). |
-| `packages/db` | Prisma schema, 5 SQL migrations (constraints and triggers), importer/seed. |
+| `packages/db` | Prisma schema, 5 SQL migrations (constraints and triggers), importer/seed, the admin tool (`admin:ensure`) and the synthetic-data cleanup tool (`cleanup:synthetic`, dry-run by default). |
 | `packages/ai` | Provider-neutral AI service (OpenRouter adapter): grounded classification and drafting, prompt-injection hardening, bounded retries. |
 
 ## Local setup
@@ -32,11 +32,17 @@ npm run dev                                    # API on :3000
 $env:VITE_USE_MOCKS="false"; $env:VITE_API_BASE_URL="http://localhost:3000/api/v1"; npm run dev:web   # web on :5173
 ```
 
-`WEB_ORIGIN` must exactly equal the browser origin (default `http://localhost:5173`). Author logins are the synthetic `synthetic.authorN@example.test` addresses. Rebuild `@bookleaf/db` / `@bookleaf/ai` after editing them; on Windows stop the running API first (it locks the Prisma engine DLL and `prisma generate` fails with EPERM).
+`WEB_ORIGIN` must exactly equal the browser origin (default `http://localhost:5173`). Locally, either register a new author at `/register` or sign in with the synthetic `synthetic.authorN@example.test` addresses. Rebuild `@bookleaf/db` / `@bookleaf/ai` after editing them; on Windows stop the running API first (it locks the Prisma engine DLL and `prisma generate` fails with EPERM).
+
+### Accounts: authors self-register, one fixed admin
+
+* **Authors** create their own account at `/register` (name, e-mail, password with confirmation). They start with an empty workspace: no books, no tickets, no access to anyone else's data.
+* **The administrator** is never self-registered. The public endpoint accepts exactly four fields and rejects `role` or any other field; there is no API that creates or promotes an admin. The single admin is created and rotated on the server: `BOOKLEAF_ADMIN_EMAIL=... BOOKLEAF_ADMIN_PASSWORD=... npm run admin:ensure --workspace @bookleaf/db` (add `-- --rotate-password` for an existing admin). There is no default admin password anywhere. See [Admin account](docs/release/ADMIN_ACCOUNT.md).
+* **Production never receives the synthetic seed:** with `NODE_ENV=production` the synthetic seed is refused unless `BOOKLEAF_ALLOW_SYNTHETIC_SEED=yes-i-understand` is set. Removing the synthetic records already in a database is the job of `npm run cleanup:synthetic --workspace @bookleaf/db` (dry-run by default, never touches the admin or the audit log); see [Cleanup inventory](docs/release/FINAL_CLEANUP_INVENTORY.md) and the [release plan](docs/release/REGISTRATION_RELEASE_PLAN.md).
 
 ### Environment variables
 
-API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESSION_SECRET` (>= 32 chars, placeholders rejected in production), `WEB_ORIGIN` (https required in production), `PORT`, `TRUST_PROXY` (hop count behind a reverse proxy), `SESSION_TTL_HOURS`, login/ticket/reply rate limits, `ATTACHMENT_DIR`, `ATTACHMENT_MAX_BYTES`, `ATTACHMENT_MAX_PER_TICKET`, and the AI settings `OPENROUTER_API_KEY` (empty = AI disabled, tickets still work), `OPENROUTER_MODEL`, `OPENROUTER_BASE_URL`, `AI_TIMEOUT_MS`, `AI_MAX_RETRIES`. Web: `VITE_API_BASE_URL`, `VITE_USE_MOCKS` (`false` for the real API; production builds always use the real API).
+API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESSION_SECRET` (>= 32 chars, placeholders rejected in production), `WEB_ORIGIN` (https required in production), `PORT`, `TRUST_PROXY` (hop count behind a reverse proxy), `SESSION_TTL_HOURS`, login/registration/ticket/reply rate limits (`REGISTER_LIMIT_PER_IP_PER_HOUR` 5, `REGISTER_LIMIT_GLOBAL_PER_HOUR` 200), `ATTACHMENT_DIR`, `ATTACHMENT_MAX_BYTES`, `ATTACHMENT_MAX_PER_TICKET`, and the AI settings `OPENROUTER_API_KEY` (empty = AI disabled, tickets still work), `OPENROUTER_MODEL`, `OPENROUTER_BASE_URL`, `AI_TIMEOUT_MS`, `AI_MAX_RETRIES`. Web: `VITE_API_BASE_URL`, `VITE_USE_MOCKS` (`false` for the real API; production builds always use the real API).
 
 ## Commands
 
@@ -46,12 +52,15 @@ API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESS
 | `npm run build` | Production build of all workspaces |
 | `npm test` | All workspace suites (AI, API incl. embedded PostgreSQL, web). The API suite starts a throwaway PostgreSQL itself |
 | `npm run test:scaffold` | Contract/Prisma/import alignment checks (run after build) |
-| `npm run test:e2e` | Browser end-to-end suite (Playwright, 30 tests) against a disposable stack: embedded PostgreSQL, built API and web, mock AI provider. Needs `npm run build` first and a Chromium (`npx playwright install chromium` or `E2E_CHROMIUM_PATH`). See [Testing](docs/TESTING.md) |
+| `npm run test:e2e` | Browser end-to-end suite (Playwright, 41 tests) against a disposable stack: embedded PostgreSQL, built API and web, mock AI provider. Needs `npm run build` first and a Chromium (`npx playwright install chromium` or `E2E_CHROMIUM_PATH`). See [Testing](docs/TESTING.md) |
 | `BOOKLEAF_AI_ENTRY=<absolute path>/packages/ai/dist/index.js npm run test --workspace @bookleaf/api` | Also runs the 11 "real AI package, mocked provider" API tests (skipped otherwise). The path must be absolute: vitest runs inside `apps/api` |
 | `npm run migrate:status --workspace @bookleaf/db` | Migration state of `DATABASE_URL` |
+| `npm run cleanup:synthetic --workspace @bookleaf/db` | **Dry run**: counts, ids and a confirmation token for removing the synthetic records. Add `-- --execute --confirm <token> --backup-stamp <stamp>` to delete (see the release plan) |
+| `npm run admin:ensure --workspace @bookleaf/db` | Create or rotate the single admin from `BOOKLEAF_ADMIN_EMAIL` / `BOOKLEAF_ADMIN_PASSWORD` |
 
 ## Security notes and limitations
 
+- Registration: public, author-only, strict body (no role field), Argon2id, password policy, unique-index duplicate guard, per-IP and global rate limits, generic `409` for an existing address (which still reveals that the address is registered: there is no e-mail verification).
 - Sessions: server-side, httpOnly cookie, `SameSite=Lax`, `Secure` in production, CSRF double-submit token + Origin check. The API does not serve the web app: deploy web and API **on the same site** (for example one reverse proxy: `/` -> static web, `/api` -> API) with `TRUST_PROXY` set.
 - Rate limits and login throttling are in memory per API process (reset on restart; not shared across instances). SSE streams and AI single-flight also assume one API instance.
 - Attachments are stored on local disk under random keys outside any served path; they must be backed up with the database. Antivirus scanning is not implemented.
@@ -70,4 +79,5 @@ The original assignment PDF and JSON stay unchanged under ignored `reference/`; 
 - [Environment guide](docs/ENVIRONMENT.md) · [Testing](docs/TESTING.md) · [Demo instructions](docs/DEMO.md)
 - [Security review](docs/SECURITY_REVIEW.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Submission checklist](docs/SUBMISSION_CHECKLIST.md)
 - [QA reports](docs/qa/FINAL_RELEASE_CHECKLIST.md) (feature matrix, E2E, security, AI, VPS, bug register) · [Architecture](docs/architecture/README.md) · [Live test scripts](tests/live/README.md)
+- [Registration release plan](docs/release/REGISTRATION_RELEASE_PLAN.md) · [Cleanup inventory](docs/release/FINAL_CLEANUP_INVENTORY.md) · [Admin account](docs/release/ADMIN_ACCOUNT.md)
 - [Docker deployment runbook](infra/DEPLOY.md) (production stack, backups, rollback, opt-in demo AI) · [Integration report](docs/INTEGRATION_REPORT.md)

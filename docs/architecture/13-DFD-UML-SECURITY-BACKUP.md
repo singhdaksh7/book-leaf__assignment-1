@@ -153,6 +153,7 @@ flowchart LR
     AD(["Administrator"])
     AI(["OpenRouter<br/>(secondary actor)"])
     subgraph SYS["BookLeaf Author Support Portal"]
+        UC0(["Create author account"])
         UC1(["Sign in / out"])
         UC2(["View own books"])
         UC3(["Create ticket"])
@@ -167,7 +168,7 @@ flowchart LR
         UC12(["Review AI analysis and draft"])
         UC13(["Run or re-run AI analysis"])
     end
-    AU --- UC1 & UC2 & UC3 & UC5 & UC6
+    AU --- UC0 & UC1 & UC2 & UC3 & UC5 & UC6
     UC3 -. "include (optional)" .-> UC4
     AD --- UC1 & UC7 & UC8 & UC9 & UC10 & UC11 & UC12 & UC13 & UC6
     UC13 -. "include" .-> AI

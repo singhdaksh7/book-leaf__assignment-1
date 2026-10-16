@@ -34,3 +34,10 @@ every numbered defect lives in [docs/qa/BUG_REGISTER.md](../qa/BUG_REGISTER.md).
 * The host has a pending reboot and 23 security-related package upgrades, and runs other tenants' containers on 1 vCPU / 3.9 GiB.
 * BookLeaf shares Traefik with other tenants; an outage or configuration change there affects BookLeaf's HTTPS entry.
 * Another tenant (Aadya) was removed from the host during the audit; the cause is unknown.
+
+## 17.4 Registration and data hygiene
+
+* Registration cannot hide that an address is already registered without e-mail verification (not implemented); mitigations are the generic `409`, equalised timing and per-IP/global limits.
+* Self-registered authors have no books until someone links them (no admin UI or API yet) and carry empty phone/city values (`WEB-<hex>` external id).
+* The audit log is append-only at the database level, so a cleanup of synthetic data cannot remove the audit rows that describe it; they stay as evidence.
+* The cleanup tool is exercised by automated tests and a local container rehearsal in the real API image; it has not been run against production.
