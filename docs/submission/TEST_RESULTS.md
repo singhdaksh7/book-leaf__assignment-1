@@ -4,7 +4,7 @@ Run on this branch after commit `9a2a3a3`, Windows 11, Node 22, Chrome for E2E. 
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| AI package | `cd packages/ai && npx vitest run` | 461 passed |
+| AI package | `cd packages/ai && npx vitest run` | 471 passed |
 | API (real Postgres) | `cd apps/api && npx vitest run` | 230 passed, 0 skipped |
 | Web | `cd apps/web && npx vitest run` | 50 passed |
 | E2E (Playwright, disposable stack) | `cd apps/web && npx playwright test` | 30 passed |
@@ -12,7 +12,7 @@ Run on this branch after commit `9a2a3a3`, Windows 11, Node 22, Chrome for E2E. 
 | Infra (mock AI server) | `npm run test:infra` | 12 passed |
 | Typecheck, build | `npm run typecheck`, `npm run build` | clean |
 | Backup scripts | manual, disposable containers | backup, restore (550 rows), wrong passphrase, tamper, retention: passed |
-| Real OpenRouter acceptance | `node tests/live/ai-real.mjs` | **BLOCKED** (no key); script exits 2 without sending anything |
+| Real OpenRouter acceptance | `node tests/live/ai-real.mjs` | **PARTIAL, exit 1**: Nemotron free model: 12 real calls, cost 0, classification 6/6, drafts 3/6; default Gemma model: upstream 429, untested |
 | Live staging scripts (`tests/live/*`) | need demo passwords | **not run this session** |
 | Mobile/responsive sweep (`ux-sweep.mjs`) | needs a deployed target | **not run this session** (earlier runs are recorded in `docs/qa/`) |
 

@@ -1,6 +1,6 @@
 # Known limitations
 
-* **Real AI unverified.** No real OpenRouter request has been made; free models may log prompts and are rate limited (20/min, 50/day without credits).
+* **Real AI only partly verified.** Real free-model drafts pass the grounding check about half the time (3/6 observed); the default model was rate limited upstream during testing; free models may log prompts and are rate limited (20/min, 50/day without credits).
 * **Staging runs the demo mock**; its output is canned text, not inference.
 * **Backups are not operational:** scripts tested locally only; nothing scheduled; no off-host copy; no restore from production data.
 * **Host risks:** a daily cron prunes unused Docker images older than 24 h (can delete rollback images); reboot and security updates pending; the deployed tree is not a git checkout.

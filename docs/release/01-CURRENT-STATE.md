@@ -1,6 +1,6 @@
 # Current state (2026-10-16)
 
-Branch `integration/bookleaf-fullstack`. Remote HEAD at start: `ba35295` (verified equal to local HEAD). Local commits since (not pushed): `452d323`, `a53c8bc`, `fecfdb8`, `f58c6c4`, `a565864`, `9a2a3a3` and the documentation commit that follows them.
+Branch `integration/bookleaf-fullstack`. Remote HEAD at start: `ba35295` (verified equal to local HEAD). Commits since `ba35295` are listed by `git log ba35295..HEAD` (AI free-model guard and real-provider fixes, backup scripts, three small fixes, diagrams, SDD, deployment plan).
 
 ## Verified inventory (counted from source this session)
 
@@ -16,7 +16,7 @@ Branch `integration/bookleaf-fullstack`. Remote HEAD at start: `ba35295` (verifi
 
 | Suite | Result |
 | --- | --- |
-| AI package (vitest) | 461 passed (456 + 5 new zero-spend guard tests) |
+| AI package (vitest) | 471 passed (456 + 15 new: zero-spend guard, greeting normalisation) |
 | API (vitest, real Postgres) | 230 passed, 0 skipped (227 + 3 new) |
 | Web (vitest) | 50 passed (48 + 2 new) |
 | Playwright E2E (Chrome, disposable stack, mock OpenRouter) | 30 passed |
@@ -25,7 +25,7 @@ Branch `integration/bookleaf-fullstack`. Remote HEAD at start: `ba35295` (verifi
 
 The 11 API tests that showed as skipped earlier belong to `ai-real-package.test.ts`, which is skipped unless a built AI package exists at `apps/api/.tmp/ai-dist` (it never existed in this checkout). The suite now falls back to `packages/ai/dist`, so it runs after `npm run build`.
 
-**These are mock-provider results.** No request to OpenRouter has been made: no API key is available. See `AI_REAL_PROVIDER.md` for the free-model evidence and the blocked acceptance run.
+**The suites above are mock-provider results.** Separately, real OpenRouter requests were made on 2026-10-16 (free tier, cost 0): classification 6/6 correct on the alternative free model, drafts 3/6 accepted; the default model was rate limited upstream. This is a partial verification, not a pass: see `AI_REAL_PROVIDER.md`.
 
 ## Live VPS (read-only inspection)
 
