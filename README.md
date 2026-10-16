@@ -2,6 +2,12 @@
 
 A full-stack author support portal: authors register themselves, browse their books and raise support tickets (with attachments and replies); admins triage a queue, assign tickets, add private notes, review AI-generated drafts and send replies. AI never sends anything: every draft is reviewed and sent by an admin.
 
+## Live demo
+
+**https://bookleaf.77.37.45.177.sslip.io** (API `bookleaf-api:3eb1aff`). Reviewer logins (one admin, ten sample authors `AUTH001`-`AUTH010` with the assignment's 18 books) are sent separately and are not in this repository. Walkthrough: [docs/submission/DEMO_WALKTHROUGH.md](docs/submission/DEMO_WALKTHROUGH.md). Approach and trade-offs on one page: [docs/submission/APPROACH_ONE_PAGER.md](docs/submission/APPROACH_ONE_PAGER.md).
+
+**AI status, stated plainly:** classification, priority and policy-grounded drafts use real OpenRouter calls (model `nvidia/nemotron-3-super-120b-a12b:free`, cost $0). Locally this was verified on the final code: 6/6 categories and priorities correct, 5/6 model drafts accepted (the sixth falls back to a labelled policy template). On the live site the free daily quota was exhausted, so live analyses currently end `AI_RATE_LIMITED` and admins reply manually; no successful live inference is claimed. A reviewer does **not** need a key for the hosted demo; to run your own copy, put `OPENROUTER_API_KEY` (and optionally `OPENROUTER_MODEL`, `:free` ids only) in the server-side environment, see [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
+
 ## Architecture
 
 npm-workspace monorepo: TypeScript, React/Vite, Express, PostgreSQL/Prisma, Zod. See [Architecture](docs/ARCHITECTURE.md).
@@ -67,11 +73,11 @@ API (`apps/api/.env.example` is the full, commented list): `DATABASE_URL`, `SESS
 - AI data minimisation: the provider receives only the ticket subject/description, the last two author-visible messages, public policy excerpts and non-financial book facts (title, status, genre, publication date, print partner, channels). Author name/email/phone/city, ISBN, MRP, royalty amounts and balances, copies sold and payout dates are never sent (allowlist in `apps/api/src/ai/context.ts`, repeated in `packages/ai`). Royalty drafts say the team will verify the figures internally; any amount a draft invents is rejected by the grounding check.
 - A missing `Origin` header is accepted on mutating requests (non-browser clients); the CSRF token is still required.
 - `TicketMessage` rows are append-only by convention (no edit route) but not DB-trigger protected; `AuditLog` is append-only at the database level (update, delete and mass delete are rejected). `InternalNote` and `TicketAssignment` reject `UPDATE` by trigger (assignments allow only the `SET NULL` of a removed assignee), but their triggers do not cover `DELETE`, so a direct SQL delete is not blocked; the API has no delete route for either.
-- Verified on Windows (Node 24.6, Chromium) and on Linux (Node 22 in Docker), and deployed as a staging stack behind Traefik with a Let's Encrypt certificate ([Deployment](infra/DEPLOY.md)). The live OpenRouter API was not exercised (no paid calls); staging runs without AI; see [Known limitations](docs/KNOWN_LIMITATIONS.md) and the [Security review](docs/SECURITY_REVIEW.md) (3 high `npm audit` advisories in the Prisma CLI chain, not reachable at runtime).
+- Verified on Windows (Node 24.6, Chromium) and on Linux (Node 22 in Docker), and deployed as a staging stack behind Traefik with a Let's Encrypt certificate ([Deployment](infra/DEPLOY.md)). Real OpenRouter calls were exercised locally on the free model (see [AI results](docs/release/AI_REAL_PROVIDER.md)); the live site's key is currently quota-limited; see [Known limitations](docs/KNOWN_LIMITATIONS.md) and the [Security review](docs/SECURITY_REVIEW.md) (3 high `npm audit` advisories in the Prisma CLI chain, not reachable at runtime).
 
-## Confidential source data
+## Source data
 
-The original assignment PDF and JSON stay unchanged under ignored `reference/`; `data/bookleaf_sample_data.json` (confidential, ignored by git) is never committed. Use only synthetic data (`data/synthetic_seed.json`) for demos, tests and screenshots.
+The assignment's original JSON/PDF are not in this repository (`data/bookleaf_sample_data.json` and `reference/` are git-ignored). The live demo database contains the assignment's 10 authors and 18 books, imported from that file with unique per-author passwords that are delivered outside Git. Tests and local setup use only the synthetic fixture (`data/synthetic_seed.json`).
 
 ## Documentation
 

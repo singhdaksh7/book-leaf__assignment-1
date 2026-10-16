@@ -4,7 +4,7 @@ Run on this branch for the registration release (2026-10-16), Windows 11, Node 2
 
 | Suite | Command | Result |
 | --- | --- | --- |
-| AI package | `cd packages/ai && npx vitest run` | 485 passed |
+| AI package | `cd packages/ai && npx vitest run` | 509 passed (includes regression tests for the real-API findings) |
 | API (real Postgres) | `cd apps/api && npx vitest run` | 292 passed, 0 skipped (230 earlier + 42 registration + 20 cleanup, seed guard and admin tool) |
 | Web | `cd apps/web && npx vitest run` | 68 passed (53 earlier + 15 registration form) |
 | E2E (Playwright, disposable stack) | `cd apps/web && npx playwright test` | 41 passed (30 earlier + 11 registration: desktop, 375 px mobile, keyboard-only) |
@@ -15,6 +15,10 @@ Run on this branch for the registration release (2026-10-16), Windows 11, Node 2
 | Backup scripts | manual, disposable containers | backup, restore (550 rows), wrong passphrase, tamper, retention: passed |
 | Real OpenRouter acceptance | `node tests/live/ai-real.mjs` | Final prompt, default Nemotron free model: classification 6/6 in every run; drafts passed validation in 12 of 13 analyses (runs of 5/6, 6/6 and 1/1); reported cost 0; account usage 0. A single run can exit 1 on one rejected draft (non-deterministic). Gemma alternative: upstream 429, untested |
 | Real provider failures | `node tests/live/ai-real-failures.mjs` | 401, nonexistent model, paid primary and paid fallback (0 requests) and a real 429: all handled as expected, no mock substitution |
+| Real OpenRouter, final code (2026-10-16) | script over `createAiServiceFromEnv`, 6 tickets | 12 provider calls per run, 14.8k tokens, reported cost $0, model `nvidia/nemotron-3-super-120b-a12b:free`. Classification and priority 6/6; model drafts accepted 5/6 (book-status draft rejected for an invented timeline, template used). Every analysis has `requiresHumanReview=true`. |
+| Production import verification | read-only SQL export vs the assignment JSON | 10 authors, 18 books, **302 field comparisons, 0 mismatches** (14 nulls, 16 zeros, 2 empty `availableOn`, 3 production statuses); 10/10 author logins; My Books counts/ids exact; cross-author access 404; wrong password 401; admin routes 401/403 |
+| Production AI smoke (live) | 6 tickets, admin analysis | **All 6 `FAILED` / `AI_RATE_LIMITED`** (free quota exhausted): graceful failure verified (no draft, nothing sent, no AI fields visible to the author). Not a successful live inference. |
+| Production admin workflow | reply, status, internal note | reply visible to the author after the admin sends it, internal note hidden, status updated |
 | Live staging scripts (`tests/live/*`) | need demo passwords | **not run this session** |
 | Mobile/responsive sweep (`ux-sweep.mjs`) | needs a deployed target | **not run this session** (earlier runs are recorded in `docs/qa/`) |
 

@@ -55,3 +55,11 @@ Server-side sessions with HttpOnly, Secure, SameSite cookies; CSRF tokens; origi
 - [ ] Live real-AI smoke test passed once (model `nvidia/nemotron-3-super-120b-a12b:free`, cost 0, no mock, human approval required) or recorded as BLOCKED with the reason
 - [ ] First scheduled backup verified (cron log, new encrypted set, checksums, retention intact, isolated restore, anchors intact, neighbours unchanged)
 - [ ] Remote HEAD and deployed images recorded in the final version of this report
+
+## Final status 2026-10-16 (supersedes any PENDING item above)
+
+* **Deployed:** API `bookleaf-api:3eb1aff`, web `12edd72`; rollback image `12edd72` retained; verified backups `20261016T080326Z` and `20261016T081004Z` taken before the release and the dataset import.
+* **Dataset:** the assignment's 10 authors and 18 books are imported alongside the older synthetic records (nothing deleted): 302 field comparisons, 0 mismatches; 10/10 logins; My Books counts and ids exact; cross-author read 404.
+* **Admin/author workflow (live):** admin reply visible to the author after the explicit send, internal note hidden, status updated.
+* **Real AI:** verified locally on the final code (classification/priority 6/6, model drafts 5/6, cost $0). **Live: quota-blocked** (`AI_RATE_LIMITED` for six analyses on 2026-10-16); no successful live inference is claimed.
+* **Not done (by decision):** synthetic-data cleanup, admin password rotation, merge to `main`.

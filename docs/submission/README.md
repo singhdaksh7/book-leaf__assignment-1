@@ -6,8 +6,8 @@ A support portal for BookLeaf Publishing. Authors raise tickets about their book
 | --- | --- |
 | Live site | https://bookleaf.77.37.45.177.sslip.io |
 | Source | private GitHub repository `singhdaksh7/book-leaf__assignment-1`, branch `integration/bookleaf-fullstack` (access on request; see the cover email) |
-| Live release | API and database `83184cd`, web `134f49b` (the registration release described below is prepared on the branch but **not yet deployed**; see `docs/release/REGISTRATION_RELEASE_PLAN.md`) |
-| Accounts | Authors register themselves (*Create account* on the sign-in page; a new account starts empty). The single administrator is created by the owner on the server and cannot be created through the site; its login is sent separately and is not in the repository. Until the approved data cleanup runs, the live database still holds the older synthetic authors `synthetic.author1@example.test` … `synthetic.author10@example.test` |
+| Live release | API `bookleaf-api:3eb1aff` (AI accuracy release, source commit `3eb1aff`), web `12edd72`, PostgreSQL 16 behind Traefik/HTTPS. The previous API image `12edd72` is kept as the one-command rollback. |
+| Accounts | **Ten sample author accounts and one admin account are provided in the separate credentials handoff (not in this repository).** The ten authors are the assignment's original `AUTH001`-`AUTH010` with all 18 books (`BK001`-`BK018`), imported unchanged (302 field comparisons, 0 mismatches). New authors can also register themselves (they start empty). The admin cannot be created through the site. |
 
 ## Stack
 
@@ -50,6 +50,7 @@ Environment templates: `infra/.env.example`, `apps/api/.env.example`, `packages/
 
 ## Honest status
 
-* Local automated tests all pass; they use mock or scripted AI providers.
-* Real-model behaviour was measured locally on the final code (classification 6/6 in every run; the strict grounding check accepted the model's draft in 12 of 13 analyses). The live-site real-AI smoke test depends on the OpenRouter free daily quota (50 requests, about 25 analyses a day); see `FINAL_ACCEPTANCE_REPORT.md` for the live result. When the quota is exhausted the portal shows a clear "AI analysis failed (AI_RATE_LIMITED)" notice and replies are written manually.
+* Local automated tests all pass: AI package 509, API 292 (real PostgreSQL), web 68, 41 browser E2E (E2E last run on the previous commit; this release changed only the AI package). They use scripted or mock AI providers.
+* **Real AI, local (real OpenRouter calls, free model, reported cost $0):** over the last three runs on the final code, classification and priority were correct for all six categories every time, and the model's draft passed the strict grounding checks for 5 of 6 tickets each time. The book-status draft was rejected each time because the model invented a timeline; the portal then shows a labelled policy-template draft instead. Details: `docs/release/AI_REAL_PROVIDER.md`.
+* **Real AI, live site: NOT demonstrated.** On 2026-10-16 the key's free daily quota (50 requests) was already used up, so six live analyses all ended `FAILED` with `AI_RATE_LIMITED`. The portal handled it as designed (clear failure notice, no draft, nothing sent, manual reply works). No successful live inference is claimed. Once the quota resets the same code runs unchanged.
 * Backups are encrypted, verified and restore-tested, with a daily cron; there is **no off-host copy**, so disaster recovery is incomplete.

@@ -1,8 +1,8 @@
-# Demo walkthrough (about 7 minutes, synthetic data only)
+# Demo walkthrough (about 7 minutes)
 
 **Live site:** https://bookleaf.77.37.45.177.sslip.io
 
-**Accounts.** *Authors register themselves*: open the live site, choose **Create account** on the sign-in page and register with any address you control (a fresh account starts with an empty dashboard, no books and no tickets). The single **administrator** account is created and managed by the owner on the server, never through the site; its address and password are sent separately and are never stored in the repository. *(Until the owner-approved data cleanup runs, the live database still contains the older synthetic authors `synthetic.author1@example.test` … `synthetic.author10@example.test` with their books and tickets; they are removed by that cleanup.)* Use two browser windows (or one normal and one private window) so the author and admin sessions do not overwrite each other. Please use one author per demo; each author can create 30 tickets per hour.
+**Accounts.** The credentials handoff (sent separately, never in the repository) lists the admin and ten sample authors `AUTH001`-`AUTH010` (the assignment's original authors and 18 books). Log in as any sample author to see *My Books* with that author's real records; use the admin account for the queue and AI review. You can also register a new author (*Create account*; it starts empty). Use two browser windows (or one normal and one private window) so the author and admin sessions do not overwrite each other. Each author can create 30 tickets per hour. Older synthetic authors and their test tickets still exist in the database until a separately approved cleanup; ignore them.
 
 ## Flow
 
@@ -27,4 +27,5 @@ The AI is advisory. It receives only minimised text, its output is treated as un
 ## Notes for reviewers
 
 * Older demonstration tickets created before the real provider was switched on may carry stored `[DEMO MOCK]` analysis text; tickets created now never do.
-* Do not use real personal data; this is a synthetic staging system.
+* Do not enter real personal data. The sample authors are the assignment's fictional records.
+* The AI panel may show `AI analysis failed (AI_RATE_LIMITED)`: the free OpenRouter daily quota is limited. That is the designed failure path; reply manually.

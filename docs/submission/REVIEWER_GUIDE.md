@@ -6,3 +6,4 @@
 4. **AI to try:** open a ticket as admin, read the analysis (category, priority, rationale, cited policy chunks, draft), edit the draft, send it as a normal reply. A rationale that begins "[Rule-based fallback" means the model output was not usable and templates were used.
 5. **Tests:** see TEST_RESULTS.md.
 6. **Live-provider test:** `node tests/live/ai-real.mjs` after placing a key in `infra/.env` (see `docs/release/AI_REAL_PROVIDER.md`).
+7. **Sample data and logins:** ten sample author accounts (the assignment's original `AUTH001`-`AUTH010`, 18 books) and one admin are in the separate credentials handoff, not in the repository. You do not need an OpenRouter key to use the live demo. To run your own copy with your own key see `docs/ENVIRONMENT.md` (reviewer setup).
