@@ -178,7 +178,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
         )}
       </nav>
 
-      {/* Adapter / Mock Indicator */}
+      {/* Developer-only adapter indicator: never rendered in production builds. */}
+      {!import.meta.env.PROD && (
       <div className="p-4 border-t border-slate-800 bg-slate-950/40">
         <div className="flex items-center justify-between text-xs mb-2">
           <span className="text-slate-400 flex items-center gap-1.5">
@@ -211,6 +212,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onCloseMobile }) => {
           )}
         </div>
       </div>
+      )}
 
       {/* User Footer Profile */}
       <div className="p-4 border-t border-slate-800 flex items-center justify-between bg-slate-950/70">

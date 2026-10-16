@@ -18,7 +18,7 @@ export const apiErrorSchema = z.object({
 });
 export type ApiError = z.infer<typeof apiErrorSchema>;
 
-export const loginRequestSchema = z.object({ email: z.string().email(), password: z.string().min(1) });
+export const loginRequestSchema = z.object({ email: z.string().trim().email(), password: z.string().min(1) });
 export const createTicketSchema = z.object({
   bookId: z.string().min(1).nullable(), subject: z.string().trim().min(3).max(200), description: z.string().trim().min(10).max(10_000)
 });

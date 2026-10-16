@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, MemoryRouter, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "../context/AuthContext";
 import { LoginPage } from "../pages/auth/LoginPage";
 
@@ -50,4 +50,27 @@ describe("LoginPage Component", () => {
       expect(screen.getByText(/Please enter both email and password/i)).toBeInTheDocument();
     });
   });
+});
+
+describe("LoginPage when already signed in", () => {
+  const stubClient = (role: "AUTHOR" | "ADMIN") =>
+    ({ getCurrentUser: async () => ({ user: { id: "u1", email: "x@example.test", role, authorProfile: null } }) }) as never;
+
+  it.each([["AUTHOR", "/dashboard", "author home"], ["ADMIN", "/admin/dashboard", "admin home"]] as const)(
+    "redirects a signed-in %s away from /login to %s",
+    async (role, target, label) => {
+      render(
+        <MemoryRouter initialEntries={["/login"]}>
+          <AuthProvider initialClient={stubClient(role)}>
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path={target} element={<div>{label}</div>} />
+            </Routes>
+          </AuthProvider>
+        </MemoryRouter>
+      );
+      await waitFor(() => expect(screen.getByText(label)).toBeInTheDocument());
+      expect(screen.queryByRole("button", { name: /Sign In to Portal/i })).not.toBeInTheDocument();
+    }
+  );
 });

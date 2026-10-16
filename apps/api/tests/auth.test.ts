@@ -35,6 +35,12 @@ describe("POST /auth/login", () => {
     expect(JSON.stringify(response.body)).not.toMatch(/passwordHash|argon2|tokenHash/);
   });
 
+  it("accepts an email with surrounding whitespace (regression: whitespace used to be rejected as an invalid email)", async () => {
+    const response = await loginRequest({ email: `  ${authorEmail().toUpperCase()}	`, password: TEST_PASSWORD });
+    expect(response.status).toBe(200);
+    expect(loginResponseSchema.parse(response.body).user.role).toBe("AUTHOR");
+  });
+
   it("logs an admin in with a null author profile", async () => {
     const response = await loginRequest({ email: ADMIN_EMAIL, password: TEST_PASSWORD });
     expect(response.status).toBe(200);

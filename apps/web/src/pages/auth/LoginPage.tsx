@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Feather, Lock, Mail, ArrowRight, ShieldCheck, User } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/common/Button";
@@ -7,7 +7,7 @@ import { Input } from "../../components/common/Input";
 import { Alert } from "../../components/common/Alert";
 
 export const LoginPage: React.FC = () => {
-  const { login, isMockMode } = useAuth();
+  const { login, isMockMode, user, isLoading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,7 +31,7 @@ export const LoginPage: React.FC = () => {
 
     try {
       setIsLoading(true);
-      const loggedInUser = await login({ email, password });
+      const loggedInUser = await login({ email: email.trim(), password });
       const target = (location.state as any)?.from?.pathname || (loggedInUser.role === "ADMIN" ? "/admin/dashboard" : "/dashboard");
       navigate(target, { replace: true });
     } catch (err: any) {
@@ -51,6 +51,11 @@ export const LoginPage: React.FC = () => {
     }
     setErrorMessage(null);
   };
+
+  // Already signed in: go to the role home (or where the user was heading) instead of showing the form again.
+  if (!authLoading && user) {
+    return <Navigate to={from !== "/dashboard" ? from : user.role === "ADMIN" ? "/admin/dashboard" : "/dashboard"} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-stone-100/70 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
