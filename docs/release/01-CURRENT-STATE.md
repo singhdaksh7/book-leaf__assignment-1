@@ -16,16 +16,16 @@ Branch `integration/bookleaf-fullstack`. Remote HEAD at start: `ba35295` (verifi
 
 | Suite | Result |
 | --- | --- |
-| AI package (vitest) | 471 passed (456 + 15 new: zero-spend guard, greeting normalisation) |
+| AI package (vitest) | 485 passed (456 + 29 new: zero-spend guard, greeting normalisation, draft quality, feature check, time-frame masking) |
 | API (vitest, real Postgres) | 230 passed, 0 skipped (227 + 3 new) |
 | Web (vitest) | 50 passed (48 + 2 new) |
-| Playwright E2E (Chrome, disposable stack, mock OpenRouter) | 30 passed |
+| Playwright E2E (Chrome, disposable stack, mock OpenRouter) | 30 passed (re-run after the final AI changes) |
 | Scaffold / infra (`node --test`) | 9 / 12 passed |
 | Typecheck (all workspaces) | clean |
 
 The 11 API tests that showed as skipped earlier belong to `ai-real-package.test.ts`, which is skipped unless a built AI package exists at `apps/api/.tmp/ai-dist` (it never existed in this checkout). The suite now falls back to `packages/ai/dist`, so it runs after `npm run build`.
 
-**The suites above are mock-provider results.** Separately, real OpenRouter requests were made on 2026-10-16 (free tier, cost 0): classification 6/6 correct on the alternative free model, drafts 3/6 accepted; the default model was rate limited upstream. This is a partial verification, not a pass: see `AI_REAL_PROVIDER.md`.
+**The suites above are mock-provider results.** Separately, real OpenRouter requests were made on 2026-10-16 (free tier, account spend 0). On the default model `nvidia/nemotron-3-super-120b-a12b:free` with the final prompt: classification 6/6 correct in every run; model drafts passed the strict validator in 12 of 13 analyses (3 of 6 before prompt hardening); real failure scenarios (rejected key, nonexistent model, paid models, rate limit) handled correctly. The Gemma alternative was rate limited upstream and is unverified. This is verification with limits, not a production acceptance rate: see `AI_REAL_PROVIDER.md`.
 
 ## Live VPS (read-only inspection)
 

@@ -4,7 +4,7 @@ flowchart LR
         SVC["@bookleaf/ai<br/>loadAiConfig()"]
         GUARD{"base URL is loopback?"}
         FREE{"model and fallback end with ':free'?"}
-        DEFAULT["Default model:<br/>google/gemma-4-31b-it:free"]
+        DEFAULT["Default model:<br/>nvidia/nemotron-3-super-120b-a12b:free"]
     end
     KEY[/"OPENROUTER_API_KEY<br/>server-side env only (infra/.env, mode 600)"/]
     OR(["openrouter.ai/api/v1<br/>free endpoint, price 0"])

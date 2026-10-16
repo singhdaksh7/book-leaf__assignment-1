@@ -215,18 +215,20 @@ For each new ticket (and on admin request) the API creates a PENDING attempt in 
 2. sanitises untrusted text (invisible characters, angle brackets, e-mail and long numbers redacted, random per-call boundary) and flags prompt-injection signals;
 3. retrieves up to three policy chunks from a static knowledge base (keyword retrieval, no embeddings);
 4. calls the model to **classify** (JSON), then to **draft** (JSON);
-5. validates both outputs against schemas, cited policy ids and a grounding check (every number/date must come from the sources; no completed-action claims, links, refund promises, unsupported timeframes or payout promises);
+5. validates both outputs against schemas, cited policy ids and a grounding check (every number/date must come from the sources; no completed-action claims, links, refund promises, unsupported timeframes, payout promises, invented quoted menu/section names, or telling the author to reply to an e-mail);
 6. stores the result: COMPLETED (model), COMPLETED with a visible *rule-based fallback* notice in the rationale when part of the model output was unusable, or FAILED with a stable error code (`AI_RATE_LIMITED`, `AI_TIMEOUT`, `AI_PROVIDER_ERROR`, `AI_NETWORK_ERROR`, `AI_INVALID_OUTPUT`, `AI_UNGROUNDED_OUTPUT`, `AI_NOT_CONFIGURED`, …).
 
 Model output is treated as untrusted data. The package has no send capability; `requiresHumanReview` is the literal `true`.
 
-Zero-spend controls: the default model is `google/gemma-4-31b-it:free`; against a real endpoint, configuration is rejected unless the primary and any fallback model ids end in `:free`; no paid fallback exists; retries are bounded (default 2) with jittered backoff and `Retry-After` respected; timeout 15 s; `max_tokens` capped (default 400); reasoning is disabled in requests so hidden reasoning tokens cannot exhaust the cap.
+Zero-spend controls: the default model is `nvidia/nemotron-3-super-120b-a12b:free` (`google/gemma-4-31b-it:free` is a supported alternative); against a real endpoint, configuration is rejected unless the primary and any fallback model ids end in `:free`; no paid fallback exists; retries are bounded (default 2) with jittered backoff and `Retry-After` respected; timeout 15 s; `max_tokens` capped (default 400); reasoning is disabled in requests so hidden reasoning tokens cannot exhaust the cap.
 
 ![AI workflow](architecture/diagrams/png/ai-workflow.png)
 
 ![Human in the loop](architecture/diagrams/png/ai-human-in-the-loop.png)
 
-**Observed with a real free model (2026-10-16, synthetic tickets).** On `nvidia/nemotron-3-super-120b-a12b:free`: 12 requests, reported cost 0, classification 6/6 correct, drafts accepted 3/6 (the others invented turnaround times or product features and were correctly rejected by the grounding check). The default Gemma model returned HTTP 429 from its upstream provider throughout and was not verified. This is a partial verification; details in `docs/release/AI_REAL_PROVIDER.md`.
+**Observed with a real free model (2026-10-16, synthetic tickets, account spend 0).** On the default `nvidia/nemotron-3-super-120b-a12b:free` with the final prompt: classification was correct for all six categories in every run, and the draft passed the strict validator in 12 of 13 analyses (it was 3 of 6 before prompt hardening), at 4-14 s per analysis and reported cost 0. The failures that remained were a model promising an unverifiable time frame or inventing a product feature, which the validator rejects and replaces with a labelled rule-based draft. The sample is small and non-deterministic. The Gemma alternative returned HTTP 429 from its upstream provider throughout and is unverified. Real failure handling was exercised against the live endpoint: rejected key (1 request, no retry), nonexistent model, paid-model configuration (0 requests) and a rate limit; none produced mock or paid output. Details, history and caveats: `docs/release/AI_REAL_PROVIDER.md`.
+
+**Draft-quality hardening.** The knowledge base's tone guideline and royalty style example contain illustrative promises such as "within 48 hours", which real models copied and the grounding check rejected. The knowledge-base text was **not** rewritten, because it could not be verified as an operational commitment; the prompt now labels those blocks as style-only illustrations, masks durations inside them (policy excerpts are never masked), and tells the model what to do when facts are missing (acknowledge, say what the team will verify, commit to no dates, amounts, response times or distribution).
 
 ## 17. Mock versus real provider modes
 
@@ -280,13 +282,13 @@ Deployment findings to act on: a host cron prunes unused Docker images older tha
 
 | Layer | Tool | Result (this branch) |
 | --- | --- | --- |
-| AI package | Vitest | 471 passed |
+| AI package | Vitest | 485 passed |
 | API with real PostgreSQL | Vitest + Supertest | 230 passed, 0 skipped |
 | Frontend | Vitest + Testing Library | 50 passed |
 | Browser E2E | Playwright (Chrome) on a disposable stack with a mock provider | 30 passed |
 | Scaffold / infra | `node --test` | 9 / 12 passed |
 | Backup scripts | manual, disposable containers | passed (see §22) |
-| Real OpenRouter | `tests/live/ai-real.mjs` | partial (see §16) |
+| Real OpenRouter | `tests/live/ai-real.mjs`, `ai-real-failures.mjs` | classification 6/6; drafts accepted 12/13 on the final prompt; failure scenarios passed (see §16) |
 | Live staging scripts, mobile sweep | `tests/live/*` | not run in this session |
 
 Regression tests were added for each fix made in this release (whitespace login e-mail, signed-in redirect from `/login`, fallback labelling, model-greeting handling, zero-spend guard). All automated AI tests use mock or scripted providers.
@@ -295,8 +297,8 @@ Regression tests were added for each fix made in this release (whitespace login 
 
 ## 24. Known limitations
 
-* Real AI is only partly verified; free models rate-limit (20/min, 50/day without credits) and may retain prompts; roughly half of real drafts were rejected by the grounding check and replaced by a labelled template.
-* The knowledge base's tone guideline suggests quoting "within 48 hours", which conflicts with the strict grounding rule; the policy text was not changed.
+* Real AI is verified with limits: small, non-deterministic sample (12 of 13 drafts accepted); the Gemma alternative was rate limited upstream; free models rate-limit (20/min, 50/day documented without credits) and may retain prompts; the validator cannot judge semantic quality, so human review is essential.
+* The knowledge base's tone guideline and royalty example suggest quoting "within 48 hours"; this is unverified as a real commitment, the AI is told not to repeat it, and the policy text was not changed. If it is a real commitment it should be added to a policy chunk.
 * Staging runs the demonstration mock.
 * Backups are implemented but not operational; no off-host copy.
 * Host risks: image-prune cron, pending reboot and updates, deployed tree not a git checkout.
@@ -306,4 +308,4 @@ Regression tests were added for each fix made in this release (whitespace login 
 
 ## 25. Conclusion
 
-The portal implements the full author-to-admin support workflow with strong tenant isolation, a defence-in-depth security model, and an AI assistant that is advisory only, grounded in policy and fail-closed. Local automated verification is extensive and green. Remaining work before calling it production-ready: finish real-provider verification (stable default free model, draft acceptance rate), install and prove the backup chain with an off-host copy, secure the rollback images, and run the planned deployment.
+The portal implements the full author-to-admin support workflow with strong tenant isolation, a defence-in-depth security model, and an AI assistant that is advisory only, grounded in policy and fail-closed. Local automated verification is extensive and green. Remaining work before calling it production-ready: repeat real-provider verification at larger scale and on the deployed site, install and prove the backup chain with an off-host copy, secure the rollback images, and run the planned deployment.

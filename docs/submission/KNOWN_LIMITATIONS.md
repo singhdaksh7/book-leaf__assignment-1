@@ -1,6 +1,7 @@
 # Known limitations
 
-* **Real AI only partly verified.** Real free-model drafts pass the grounding check about half the time (3/6 observed); the default model was rate limited upstream during testing; free models may log prompts and are rate limited (20/min, 50/day without credits).
+* **Real AI verified with limits.** On the default free model, classification was 6/6 correct and drafts passed the grounding check in 12 of 13 analyses after prompt hardening (3/6 before); the sample is small and non-deterministic, so expect an occasional labelled rule-based fallback. The Gemma alternative was rate limited upstream. Free models may log prompts and are rate limited (20/min, 50/day documented without credits). The validator cannot judge semantic quality; human review is required (and enforced).
+* **The 48-hour wording** in the knowledge-base tone guideline and royalty example is unverified as a company commitment. The AI is told not to repeat it; add it to a policy chunk if it is real.
 * **Staging runs the demo mock**; its output is canned text, not inference.
 * **Backups are not operational:** scripts tested locally only; nothing scheduled; no off-host copy; no restore from production data.
 * **Host risks:** a daily cron prunes unused Docker images older than 24 h (can delete rollback images); reboot and security updates pending; the deployed tree is not a git checkout.

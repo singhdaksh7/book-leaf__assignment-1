@@ -9,7 +9,7 @@ Nothing in this document has been run against the VPS. Execution needs the owner
 | Services affected | `api` and `web` containers of compose project `bookleaf` only |
 | Not touched | `db` container and volumes, Traefik, every other project (printout, vastraa, kp-crm, daxul_labs), Aadya, the host (no reboot, no package updates, no cron changes) |
 | Database migrations | **None.** `packages/db` is unchanged since `ba35295`; do **not** run the `migrate` job |
-| Behaviour changes | free-model default and guard; reasoning disabled in requests; greeting normalisation; fallback notice; login e-mail trimming; `/login` redirect; "API Mode" text hidden in production builds |
+| Behaviour changes | default model now `nvidia/nemotron-3-super-120b-a12b:free`; free-model guard; reasoning disabled in requests; greeting normalisation; time frames masked in style-only prompt blocks, "when facts are missing" rule, invented-UI-feature check; fallback notice; login e-mail trimming; `/login` redirect; "API Mode" text hidden in production builds |
 | Environment changes | remove the demo override; set a real `OPENROUTER_API_KEY` in the server's `infra/.env`; `OPENROUTER_MODEL` is optional |
 | Expected downtime | a few seconds per container recreate (api, then web) |
 
@@ -19,15 +19,16 @@ Nothing in this document has been run against the VPS. Execution needs the owner
 2. `npm run typecheck`, unit, API and E2E suites pass at `<SHA>` (recorded in the final report).
 3. A **fresh pre-deployment backup** exists and decrypts. Today only unencrypted manual dumps exist; run the new `backup.sh` once on the server (needs `BACKUP_PASSPHRASE_FILE`; see `docs/operations/BACKUP_AND_RECOVERY.md`) or take a plain `pg_dump` as the existing runbook does, and copy it **off the server** before continuing.
 4. Rollback images are protected (§4).
-5. Real-provider decision: which free model to use (Gemma 4 31B was rate-limited upstream during testing; Nemotron 3 Super worked with 3/6 drafts accepted). Without a decision the default model is used and may answer 429, in which case every AI attempt is recorded `FAILED AI_RATE_LIMITED` and tickets continue manually.
+5. Real-provider model: the default is now `nvidia/nemotron-3-super-120b-a12b:free` (classification 6/6; drafts passed validation in 12 of 13 real analyses on the final prompt; see `AI_REAL_PROVIDER.md`). The server `.env` must **not** set `OPENROUTER_MODEL` to Gemma: that alternative was rate limited upstream and is unverified. If the free model is rate limited or down at deploy time, attempts are recorded `FAILED` with a code and tickets continue manually; nothing falls back to a paid model or the mock.
+6. Before deploying, on the workstation at `<SHA>`: `npm run build`, then `OPENROUTER_MODEL= node tests/live/ai-real.mjs` (blank override so the code default is used) and `node tests/live/ai-real-failures.mjs`. Repeat once if a single draft is rejected (non-deterministic). Do not deploy if classification or the failure scenarios fail.
 
 ## 3. Secret installation (no key in chat, shell history or git)
 
 On the workstation: the key already lives only in `infra/.env` (git-ignored). Copy the single line to the server without printing it:
 
 ```bash
-# workstation (Git Bash): sends only the OPENROUTER_* lines, never the whole file
-grep -E '^OPENROUTER_(API_KEY|MODEL)=' infra/.env | ssh root@77.37.45.177 'umask 077; cat > /opt/bookleaf/src/infra/.env.openrouter'
+# workstation (Git Bash): sends ONLY the key line, never the whole file and never a local OPENROUTER_MODEL pin
+grep -E '^OPENROUTER_API_KEY=' infra/.env | ssh root@77.37.45.177 'umask 077; cat > /opt/bookleaf/src/infra/.env.openrouter'
 ```
 
 On the server, merge into the existing `infra/.env` (keeping mode 600, never `cat` it):
@@ -37,7 +38,7 @@ cd /opt/bookleaf/src/infra && cp -p .env .env.pre-release   # keeps the previous
 grep -v -E '^OPENROUTER_(API_KEY|MODEL|BASE_URL)=' .env.pre-release > .env && cat .env.openrouter >> .env && rm .env.openrouter && chmod 600 .env
 ```
 
-`OPENROUTER_BASE_URL` must be **absent** from `.env` (the default is the real endpoint). Verify without revealing values: `grep -c '^OPENROUTER_API_KEY=.\{8,\}' .env` prints `1`, and `grep '^OPENROUTER_MODEL=' .env` shows a `:free` id.
+`OPENROUTER_BASE_URL` must be **absent** from `.env` (the default is the real endpoint), and `OPENROUTER_MODEL` should be absent too so the Nemotron default applies (or set to a `:free` id on purpose). Verify without revealing values: `grep -c '^OPENROUTER_API_KEY=.\{8,\}' .env` prints `1`; `grep -E '^OPENROUTER_(MODEL|BASE_URL)=' .env` prints nothing or a `:free` id.
 
 ## 4. Preserve rollback images without touching the host cron
 
@@ -80,7 +81,7 @@ Confirm the mock is gone: `docker exec bookleaf-api sh -c 'echo ${MOCK_AI_ACK:-u
 ## 7. Health checks and smoke tests
 
 1. `curl -s -o /dev/null -w '%{http_code}\n' https://bookleaf.77.37.45.177.sslip.io/healthz` is 200; the site loads over HTTPS.
-2. Synthetic accounts only: sign in as an author, create a ticket with a small attachment, sign in as admin, open the ticket, read the analysis. Expected: a real model answer (no `[DEMO MOCK]` text). A `FAILED AI_RATE_LIMITED` result is a provider limit, not a deployment fault; report it, do not switch models silently.
+2. Synthetic accounts only: sign in as an author, create a ticket with a small attachment, sign in as admin, open the ticket, read the analysis. Expected: a real model answer (no `[DEMO MOCK]` text). Roughly one draft in ten may come back as a labelled rule-based fallback (strict grounding rejecting an invented promise); that is the safeguard working. A `FAILED AI_RATE_LIMITED` result is a provider limit, not a deployment fault; report it, do not switch models silently.
 3. Edit the draft and send; check the author sees the reply live and the internal note stays hidden.
 4. `tests/live/api-matrix.mjs`, `audit-live.mjs`, `closed.mjs` with the demo passwords (they create synthetic tickets). `ai-live.mjs` and `ai-probe.mjs` assume the demo labels and **will report failures against a real model by design**; use the manual check in step 2 instead.
 5. Database persistence: the new ticket survives `docker restart bookleaf-api` (restart only that container).

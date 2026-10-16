@@ -11,7 +11,7 @@ flowchart TB
     subgraph NET["Internet"]
         BR["Browsers<br/>HTTPS 443, HTTP 80 redirects"]
         LE["Let's Encrypt<br/>HTTP-01 challenge"]
-        ORP["OpenRouter API (HTTPS)<br/>real provider mode: free model only<br/>default google/gemma-4-31b-it:free"]
+        ORP["OpenRouter API (HTTPS)<br/>real provider mode: free model only<br/>default nvidia/nemotron-3-super-120b-a12b:free"]
     end
 
     subgraph VPS["VPS 77.37.45.177 - Ubuntu 24.04, 1 vCPU, 3.9 GiB RAM, 2 GiB swap, 48 GB disk"]
