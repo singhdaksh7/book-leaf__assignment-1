@@ -22,7 +22,7 @@ flowchart TB
         subgraph PROJ["Compose project bookleaf  (/opt/bookleaf/src/infra)"]
             subgraph EDGE["network bookleaf_edge"]
                 WEB["web<br/>nginx-unprivileged :8080<br/>mem 64 MiB"]
-                API["api  :3000<br/>Node 22 + Express<br/>mem 512 MiB<br/>[OPTIONAL demo override only: supervised mock on 127.0.0.1:8080,<br/>needs MOCK_AI_ACK=demonstration-only; staging currently runs this]"]
+                API["api  :3000<br/>Node 22 + Express<br/>mem 512 MiB<br/>real OpenRouter provider (mock disabled)<br/>[optional demo override: mock on 127.0.0.1:8080,<br/>needs MOCK_AI_ACK=demonstration-only]"]
             end
             subgraph INT["network bookleaf_internal (internal: true)"]
                 DB[("db<br/>postgres:16-alpine, UTF8<br/>mem 512 MiB")]
@@ -30,7 +30,7 @@ flowchart TB
             VPG[("volume bookleaf_bookleaf_pgdata")]
             VAT[("volume bookleaf_bookleaf_attachments<br/>/data/attachments")]
             ENV[".env (mode 600)<br/>secrets, never in git"]
-            BK["backups/ (mode 700)<br/>encrypted pg_dump + attachments tar<br/>manual run only: no schedule installed, no off-host copy"]
+            BK["backups/ (mode 700)<br/>encrypted pg_dump + attachments tar<br/>daily cron 02:30 UTC, weekly restore test; local only, no off-host copy"]
         end
     end
 

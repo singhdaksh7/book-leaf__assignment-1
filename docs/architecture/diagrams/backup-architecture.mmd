@@ -3,7 +3,7 @@ flowchart TB
     subgraph HOST["VPS (compose project bookleaf)"]
         DB[("bookleaf-db")]
         VOL[("attachments volume (read-only mount)")]
-        SCR["infra/scripts/backup.sh<br/>(manual today; cron example provided, NOT installed)"]
+        SCR["infra/scripts/backup.sh<br/>(daily cron 02:30 UTC installed 2026-10-16)"]
         PASS[/"BACKUP_PASSPHRASE_FILE (mode 600)"/]
         subgraph STORE["backups/ (mode 700)"]
             DAILY["daily/ keep 7"]

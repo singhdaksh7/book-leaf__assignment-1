@@ -1,6 +1,6 @@
 # Backup and recovery
 
-**Status (read first).** The scripts below are implemented and were tested locally against disposable containers. They are **not installed on the VPS**, **no off-host destination is configured**, and **no restore from a production backup has been performed**. Until the owner completes the setup in §5 and the checks in §6 pass, backups are not operational.
+**Status (read first).** The scripts below are implemented, were tested locally against disposable containers, and since 2026-10-16 are **installed on the VPS** with a daily cron entry. A first encrypted backup of the live database was taken and **restored into an isolated disposable database with matching row counts** (119 tickets, 25 attachments, 122 AI attempts). The first *scheduled* run (02:30 UTC) has not yet been observed, and **no off-host destination is configured**, so backups are local-only on the same disk (the owner also holds a copy of the first set on a workstation): disaster recovery is incomplete until §5 step 1 and the §6 checklist are done.
 
 Observed on the VPS (read-only inspection, 2026-10-16): `/opt/bookleaf/src/infra/backups/` holds four manually taken, **unencrypted** dump/tar pairs (latest 2026-10-16 03:05 UTC) on the same disk as the data; root has no crontab and there is no backup timer.
 
@@ -19,7 +19,7 @@ Not backed up: `infra/.env` (secrets; keep them in the owner's password manager)
 | --- | --- |
 | `infra/scripts/backup.sh` | Dump, encrypt, verify (decrypt + `pg_restore --list` + `tar t` + SHA-256 manifest), rotate, optional rclone upload, status file, optional failure webhook |
 | `infra/scripts/restore-test.sh` | Decrypts the newest (or a named) backup, verifies its checksum and restores it into a **disposable** postgres container (internal network, tmpfs, removed afterwards). Never touches the live database |
-| `infra/scripts/bookleaf-backup.cron.example` | Example schedule (daily backup 02:30 UTC, weekly restore test). Not installed |
+| `infra/scripts/bookleaf-backup.cron.example` | Schedule (daily backup 02:30 UTC, weekly restore test Monday 03:30 UTC); installed on the VPS as `/etc/cron.d/bookleaf-backup` on 2026-10-16 |
 
 Configuration is by environment variable: `BACKUP_PASSPHRASE_FILE` (required), `BACKUP_DIR`, `DB_CONTAINER`, `ATTACH_VOLUME`, `BACKUP_REMOTE`, `BACKUP_ALERT_WEBHOOK`, `BACKUP_ALERT_ON_SUCCESS`, `KEEP_DAILY`/`KEEP_WEEKLY`/`KEEP_MONTHLY` (7/4/3). The status of the last run is written to `backups/last-status.json` (`status`, `time`, `message`, `offHost`).
 

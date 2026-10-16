@@ -8,7 +8,7 @@
 | Date | 2026-10-16 |
 | Status | Describes the implemented application. Items not implemented or not verified are stated as such |
 | Repository | private GitHub repository `singhdaksh7/book-leaf__assignment-1` |
-| Staging | https://bookleaf.77.37.45.177.sslip.io (runs a demonstration AI mock, see §17) |
+| Staging | https://bookleaf.77.37.45.177.sslip.io (runs release `83184cd` with the real OpenRouter provider; the free daily AI quota was exhausted during acceptance, see §16 and §21) |
 
 **Reading note.** Every statement describes code that exists in the repository. Where a capability was tested only with mocks, or not tested, the text says so. Detailed per-component documents are in `docs/architecture/`; this document summarises them and links the diagrams.
 
@@ -240,7 +240,7 @@ Zero-spend controls: the default model is `nvidia/nemotron-3-super-120b-a12b:fre
 | Model guard | `:free` ids only | exempt (no billable calls) |
 | On failure | Attempt FAILED with an error code | n/a |
 
-The system never substitutes mock output for a failed real call. The staging site **currently runs the demonstration mock**.
+The system never substitutes mock output for a failed real call. Since 2026-10-16 the staging site runs the **real provider** (mock disabled); the demonstration mock remains an opt-in override only.
 
 ![Provider modes](architecture/diagrams/png/ai-provider-modes.png)
 
@@ -274,7 +274,7 @@ Deployment findings to act on: a host cron prunes unused Docker images older tha
 
 ## 22. Backup and recovery
 
-`infra/scripts/backup.sh` writes an encrypted (AES-256, PBKDF2) custom-format database dump and an attachments archive, verifies them (decrypt, `pg_restore --list`, `tar t`, SHA-256 manifest), rotates 7 daily / 4 weekly / 3 monthly sets, records `last-status.json`, can alert a webhook and can upload to an rclone destination. `restore-test.sh` restores into a disposable container. **Status:** tested locally with disposable containers only (550-row restore, wrong passphrase and tampered archive rejected, retention). Not installed on the VPS; no off-host destination; no restore from production data. Recovery objectives are targets, not guarantees. See `docs/operations/BACKUP_AND_RECOVERY.md` and `DISASTER_RECOVERY.md`.
+`infra/scripts/backup.sh` writes an encrypted (AES-256, PBKDF2) custom-format database dump and an attachments archive, verifies them (decrypt, `pg_restore --list`, `tar t`, SHA-256 manifest), rotates 7 daily / 4 weekly / 3 monthly sets, records `last-status.json`, can alert a webhook and can upload to an rclone destination. `restore-test.sh` restores into a disposable container. **Status:** tested locally with disposable containers only (550-row restore, wrong passphrase and tampered archive rejected, retention). Installed on the VPS (daily 02:30 UTC cron, weekly restore test) on 2026-10-16; a restore of a backup of the live database was proven in a disposable container (119 tickets, 25 attachments, 122 AI attempts matched). No off-host destination exists, so backups are local-only; the first scheduled run is not yet observed. Recovery objectives are targets, not guarantees. See `docs/operations/BACKUP_AND_RECOVERY.md` and `DISASTER_RECOVERY.md`.
 
 ![Backup architecture](architecture/diagrams/png/backup-architecture.png)
 
@@ -299,8 +299,8 @@ Regression tests were added for each fix made in this release (whitespace login 
 
 * Real AI is verified with limits: small, non-deterministic sample (12 of 13 drafts accepted); the Gemma alternative was rate limited upstream; free models rate-limit (20/min, 50/day documented without credits) and may retain prompts; the validator cannot judge semantic quality, so human review is essential.
 * The knowledge base's tone guideline and royalty example suggest quoting "within 48 hours"; this is unverified as a real commitment, the AI is told not to repeat it, and the policy text was not changed. If it is a real commitment it should be added to a policy chunk.
-* Staging runs the demonstration mock.
-* Backups are implemented but not operational; no off-host copy.
+* Real AI on the live site is unverified because the free daily quota (50 requests) was exhausted during acceptance; a key without purchased credits supports about 25 analyses a day.
+* Backups are installed and scheduled, with a restore proven in isolation, but there is no off-host copy, so disaster recovery is incomplete; the first scheduled run is not yet observed.
 * Host risks: image-prune cron, pending reboot and updates, deployed tree not a git checkout.
 * Deferred defects: duplicate tickets on concurrent identical submissions; admin search covers the current page only; health endpoint is liveness-only; internal-note/assignment deletion not trigger-protected (needs a migration).
 * Not implemented: password reset, e-mail notifications, attachment deletion, server-side search.

@@ -8,6 +8,6 @@
 
 **AI:** classification into six categories (royalty/payments, ISBN/metadata, printing quality, distribution/availability, book status/production, general), priority, confidence, rationale, cited policy chunks, grounded draft reply; prompt-injection and PII safeguards; bounded retries; failures recorded, never replaced by mock output; human review always required.
 
-**Operations:** Docker Compose stack (db, api, web) behind a shared Traefik; encrypted verified backups with restore test (scripts tested locally only, not installed on the VPS).
+**Operations:** Docker Compose stack (db, api, web) behind a shared Traefik; encrypted verified backups with restore test (installed and scheduled on the VPS; restore proven in isolation; no off-host copy).
 
-**Not implemented:** password reset, e-mail notifications, file deletion, server-side search, scheduled production backups, off-host backup.
+**Not implemented:** password reset, e-mail notifications, file deletion, server-side search, off-host backup.

@@ -1,6 +1,6 @@
 # 13. Data Flow Levels, UML, Security, Backup and AI Provider Diagrams
 
-Complements [12 Data flow diagrams](12-DATA-FLOW-DIAGRAMS.md) (concrete flows) with the formal DFD levels, the remaining UML views, and the security, backup and AI-provider architecture. Every element below was taken from the schema (`packages/db/prisma/schema.prisma`), the OpenAPI file and the source named in the neighbouring documents; the **backup** diagram describes scripts that exist in the repository but are **not installed on the VPS** (see §13.9).
+Complements [12 Data flow diagrams](12-DATA-FLOW-DIAGRAMS.md) (concrete flows) with the formal DFD levels, the remaining UML views, and the security, backup and AI-provider architecture. Every element below was taken from the schema (`packages/db/prisma/schema.prisma`), the OpenAPI file and the source named in the neighbouring documents; the **backup** diagram describes scripts that are installed on the VPS with a daily cron (see the status note after it for what was and was not verified).
 
 ## 13.1 DFD Level 0 (context)
 
@@ -340,7 +340,7 @@ flowchart TB
     subgraph HOST["VPS (compose project bookleaf)"]
         DB[("bookleaf-db")]
         VOL[("attachments volume (read-only mount)")]
-        SCR["infra/scripts/backup.sh<br/>(manual today; cron example provided, NOT installed)"]
+        SCR["infra/scripts/backup.sh<br/>(daily cron 02:30 UTC installed 2026-10-16)"]
         PASS[/"BACKUP_PASSPHRASE_FILE (mode 600)"/]
         subgraph STORE["backups/ (mode 700)"]
             DAILY["daily/ keep 7"]
@@ -365,4 +365,4 @@ flowchart TB
     DAILY --> RT --> TMP
 ```
 
-Status of the backup chain: the scripts were exercised locally against disposable containers (backup, checksum, restore of 550 rows, wrong passphrase and tampered archive rejected, retention pruning). They have **not** been installed on the VPS, no off-host destination exists, and no restore has been performed from a production backup.
+Status of the backup chain: the scripts were exercised locally against disposable containers (backup, checksum, restore of 550 rows, wrong passphrase and tampered archive rejected, retention pruning). They were later installed on the VPS (2026-10-16) and a backup of the live database was restored in a disposable container with matching row counts. No off-host destination exists, and the first scheduled run has not yet been observed.

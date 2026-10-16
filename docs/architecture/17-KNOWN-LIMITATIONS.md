@@ -23,7 +23,7 @@ every numbered defect lives in [docs/qa/BUG_REGISTER.md](../qa/BUG_REGISTER.md).
 | Real OpenRouter inference | Never exercised. Output quality, latency and cost are unknown |
 | Staging demo AI | Canned, keyword-matched text labelled `[DEMO MOCK]` / `[DEMO DRAFT]`; it proves the pipeline and review flow only |
 | TLS renewal | Certificate valid to 2027-01-13; renewal by Traefik was not observed |
-| Backups | Manual only: no schedule, no off-host copy, same disk as the data |
+| Backups | Encrypted daily cron installed 2026-10-16 (first scheduled run not yet observed); no off-host copy, same disk as the data |
 | Multi-instance behaviour, load, soak, accessibility audit | Not tested |
 | Browsers | Chromium and Microsoft Edge only |
 | CI | None; test suites are run by hand |

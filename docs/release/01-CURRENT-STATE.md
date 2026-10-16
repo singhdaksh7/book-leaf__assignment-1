@@ -27,7 +27,7 @@ The 11 API tests that showed as skipped earlier belong to `ai-real-package.test.
 
 **The suites above are mock-provider results.** Separately, real OpenRouter requests were made on 2026-10-16 (free tier, account spend 0). On the default model `nvidia/nemotron-3-super-120b-a12b:free` with the final prompt: classification 6/6 correct in every run; model drafts passed the strict validator in 12 of 13 analyses (3 of 6 before prompt hardening); real failure scenarios (rejected key, nonexistent model, paid models, rate limit) handled correctly. The Gemma alternative was rate limited upstream and is unverified. This is verification with limits, not a production acceptance rate: see `AI_REAL_PROVIDER.md`.
 
-## Live VPS (read-only inspection)
+## Live VPS (pre-deployment read-only inspection; superseded where `DEPLOYMENT_RECORD.md` says otherwise)
 
 | Finding | Detail |
 | --- | --- |
@@ -37,7 +37,7 @@ The 11 API tests that showed as skipped earlier belong to `ai-real-package.test.
 | TLS | Let's Encrypt, expires 2027-01-13 |
 | Resources | disk 30% used (34 GB free), memory 1.5 of 3.9 GB used, load 0.3 |
 | Exposure | Only 22, 80, 443 listen publicly; the database sits on an internal Docker network |
-| Backups | four manual **unencrypted** local pairs (latest 2026-10-16 03:05 UTC); no cron, no timer, no off-host copy |
+| Backups | before deployment: four manual **unencrypted** local pairs, no cron, no off-host copy. After deployment: encrypted verified backup, isolated restore proven, daily cron installed (see `DEPLOYMENT_RECORD.md`); still no off-host copy |
 | Rollback images | `bookleaf-api:pre-mockai`, `bookleaf-web:loginfix-20261015`, `bookleaf-web:localtest` exist but a host cron (`docker image prune -af --filter until=24h`) will delete unused images older than 24 h |
 | Host | reboot pending (`/var/run/reboot-required`); not changed |
 | Aadya | not listed among running containers or in `/opt` (`ls /opt`: bookleaf, containerd, daxul_labs, kp-crm, vastraa). Reported as a separate incident; no restoration attempted |

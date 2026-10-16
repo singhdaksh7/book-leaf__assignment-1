@@ -4,7 +4,7 @@ Authors raise support tickets about their books; administrators triage them with
 
 | | |
 | --- | --- |
-| Live staging | https://bookleaf.77.37.45.177.sslip.io (**runs the demonstration mock AI, not a real model**, at the time of writing) |
+| Live staging | https://bookleaf.77.37.45.177.sslip.io (release `83184cd`, real OpenRouter provider; when the free daily AI quota is exhausted, AI attempts show a rate-limit error and replies are written manually) |
 | Repository | private GitHub repository `singhdaksh7/book-leaf__assignment-1`, branch `integration/bookleaf-fullstack` |
 | Stack | React + Vite + TypeScript, Node 22 + Express, PostgreSQL 16 + Prisma, Zod contracts, OpenRouter AI, Docker Compose behind Traefik |
 | Reviewer access | demo accounts are shared out of band; no passwords are stored in the repository |

@@ -2,7 +2,7 @@
 
 > **Read this first.** The AI feature is **advisory**: it classifies a ticket and drafts a reply for an admin to review. It cannot send a message, change a ticket's status, category, priority or assignment, or reach an author.
 >
-> **The staging deployment uses a deterministic mock provider (`infra/mock-ai`). It does not perform language-model inference.** Its outputs are canned, keyword-matched demonstration text labelled `[DEMO MOCK …]` / `[DEMO DRAFT …]`. Successful staging runs and mock-based tests demonstrate that the pipeline, validation, persistence and review UI work; they are **not** evidence of real-model quality, latency or cost. The code path to the real provider (default free model, zero-spend guard) exists and was exercised once with a real key on 2026-10-16 with partial results (see `docs/release/AI_REAL_PROVIDER.md`); the staging site itself has never run it.
+> **Since 2026-10-16 the staging deployment runs the real OpenRouter provider** (default free model; mock disabled). The deterministic mock (`infra/mock-ai`, outputs labelled `[DEMO MOCK …]` / `[DEMO DRAFT …]`) is an opt-in override that performs no language-model inference. Mock-based tests demonstrate that the pipeline, validation, persistence and review UI work; they are **not** evidence of real-model quality, latency or cost. The code path to the real provider (default free model, zero-spend guard) exists and was exercised once with a real key on 2026-10-16 with partial results (see `docs/release/AI_REAL_PROVIDER.md`); the staging site now runs it, but real inference on the deployed site is unverified because the free daily quota was exhausted during acceptance (`docs/release/DEPLOYMENT_RECORD.md`).
 
 ## 9.1 Components
 

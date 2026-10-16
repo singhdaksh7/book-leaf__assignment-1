@@ -1,4 +1,4 @@
-# Deployment plan (PREPARED, NOT EXECUTED)
+# Deployment plan (EXECUTED 2026-10-16 with deviations: see `DEPLOYMENT_RECORD.md`)
 
 Nothing in this document has been run against the VPS. Execution needs the owner's explicit approval. The release SHA is the head of `integration/bookleaf-fullstack` at the time of approval (recorded in the final report; replace `<SHA>` below).
 

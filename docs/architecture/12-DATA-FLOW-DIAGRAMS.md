@@ -66,4 +66,4 @@ Notes. The test `9b` in `apps/web/e2e/01-journey.spec.ts` inspects the exact byt
 | `AiAnalysis` | classification, rationale, draft, citations, token cost | Medium | admin endpoints only; author never receives it |
 | `AuditLog` | actor, action, entity, request id, `before`/`after` JSON | Medium | append-only by trigger. The JSON holds only identifiers and enum values (observed keys: `messageId`, `noteId`, `attemptId`, `assigneeId`, `category`, `priority`, `status`, `visibility`), never message text; the API exposes neither column |
 | attachments volume | uploaded files | Medium-High | random keys, mode 0600, ownership checked in the lookup, forced-download headers |
-| `backups/` | database dump, attachment tarball | High | mode 700 directory on the same disk; no schedule, no off-host copy |
+| `backups/` | database dump, attachment tarball | High | mode 700 directory on the same disk; encrypted since 2026-10-16, daily cron installed, no off-host copy |
