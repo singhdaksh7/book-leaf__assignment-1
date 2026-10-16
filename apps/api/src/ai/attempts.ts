@@ -75,6 +75,9 @@ export function sanitiseRow(row: AiRowData, fallbackPromptVersion: string): AiRo
  * Persists and drives AI analysis attempts. It never classifies or drafts (the engine does), never creates a ticket
  * message and never changes ticket status: a draft is only data for an admin to review.
  */
+/** Prefix added to a COMPLETED analysis whose classification and/or draft came from built-in rules because the model output was unusable. */
+export const FALLBACK_NOTICE = "[Rule-based fallback: the AI model's output was unavailable or failed validation for part of this analysis. Review carefully.] ";
+
 export class AiAttemptService {
   private readonly prisma: PrismaClient;
   private readonly engine: AiEngine;
@@ -207,6 +210,10 @@ export class AiAttemptService {
       const result = await this.engine.run(input);
       row = sanitiseRow(result.row, fallbackVersion);
       quality = result.quality;
+      // Never present rule-based output as model output: the stored rationale (shown to the admin) says so. No schema change needed.
+      if (row.status === "COMPLETED" && quality !== "MODEL" && row.rationale && !row.rationale.startsWith(FALLBACK_NOTICE)) {
+        row = { ...row, rationale: `${FALLBACK_NOTICE}${row.rationale}` };
+      }
     } catch {
       row = sanitiseRow({ ...this.engine.abandonedRow(), errorCode: "AI_INTERNAL_ERROR" }, fallbackVersion);
     }

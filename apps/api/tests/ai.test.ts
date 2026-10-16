@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import request from "supertest";
 import { aiAnalysisAttemptSchema, aiAnalysisRequestResponseSchema, aiAnalysisResponseSchema } from "@bookleaf/contracts";
 import { PrismaClient } from "@bookleaf/db";
-import { AiAttemptService, sanitiseRow } from "../src/ai/attempts.js";
+import { AiAttemptService, FALLBACK_NOTICE, sanitiseRow } from "../src/ai/attempts.js";
 import { createEngineFromModule, createUnavailableEngine, loadPackageEngine } from "../src/ai/engine.js";
 import { TicketEventHub } from "../src/events/hub.js";
 import { ADMIN_EMAIL, WEB_ORIGIN, createTestApp, loadSyntheticDataset, login, makeTicket, mutate, profileFor, resetDatabase, seedSynthetic } from "./helpers.js";
@@ -140,6 +140,22 @@ describe("failure handling", () => {
     const [row] = await attempts(ticketId);
     expect(row).toMatchObject({ status: "COMPLETED", confidence: 0.3, model: "test/model-a,test/model-b" });
     expect(s.log.lines.find((l) => l.message === "ai attempt finished")).toMatchObject({ status: "COMPLETED", quality: "PARTIAL_FALLBACK", attemptId: row!.id });
+  });
+
+  it("labels a partial fallback in the stored rationale so rule-based output is never presented as model output", async () => {
+    const s = setup({ engine: fakeEngine(async () => ({ row: completedRow({ rationale: "Heuristic match on royalty keywords." }), quality: "PARTIAL_FALLBACK" })) });
+    const { ticketId } = await createTicket(s);
+    await s.ai.idle();
+    const [row] = await attempts(ticketId);
+    expect(row!.rationale).toBe(`${FALLBACK_NOTICE}Heuristic match on royalty keywords.`);
+  });
+
+  it("does not label a fully model-generated analysis", async () => {
+    const s = setup({ engine: fakeEngine(async () => ({ row: completedRow({ rationale: "Model rationale." }), quality: "MODEL" })) });
+    const { ticketId } = await createTicket(s);
+    await s.ai.idle();
+    const [row] = await attempts(ticketId);
+    expect(row!.rationale).toBe("Model rationale.");
   });
 
   it("records a full fallback as FAILED with no draft, keeping usage and an unknown cost null", async () => {
