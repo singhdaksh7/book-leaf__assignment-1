@@ -37,22 +37,32 @@ await step("admin assigns to self, sets status (persists after reload)", async (
   await admin.reload(); await expect(admin.getByText("Assigned to You")).toBeVisible(); await expect(sel).toHaveValue("IN_PROGRESS");
 });
 await step("admin adds internal note (persists)", async () => { await admin.getByPlaceholder("Add private note for editorial or accounting team...").fill(note); await admin.getByRole("button", { name: "Save Internal Note" }).click(); await expect(admin.getByText(note)).toBeVisible(); await admin.reload(); await expect(admin.getByText(note)).toBeVisible(); });
-await step("AI panel shows demo-labelled draft; nothing auto-sent", async () => {
-  await expect(async () => { await admin.reload(); await expect(admin.getByRole("button", { name: "Insert Draft into Reply Box" })).toBeVisible({ timeout: 2000 }); }).toPass({ timeout: 40000 });
-  await expect(admin.getByText("Human Review Required")).toBeVisible();
-  await expect(admin.getByText(/\[DEMO MOCK/).first()).toBeVisible();
-  await expect(admin.getByText("BookLeaf Staff Reply")).toHaveCount(0);
+const DEMO = process.env.EXPECT_DEMO === "1"; // only for the opt-in demonstration mock; the default targets the real OpenRouter provider
+const approved = `Admin-approved reply ${stamp}`;
+let aiOutcome = "unknown";
+await step("AI panel shows a real analysis or an honest failure; human review required; nothing auto-sent", async () => {
+  const insert = admin.getByRole("button", { name: "Insert Draft into Reply Box" }), failed = admin.getByTestId("ai-failed").or(admin.getByText(/No AI analysis record generated yet/)); // second form: releases before the failure notice existed
+  await expect(async () => { await admin.reload(); await expect(insert.or(failed)).toBeVisible({ timeout: 2000 }); }).toPass({ timeout: 60000 });
+  aiOutcome = (await insert.count()) > 0 ? "completed" : "failed";
+  console.log("INFO  AI panel state: " + aiOutcome + (aiOutcome === "failed" ? " (" + (await failed.innerText()).split("\n")[0] + ")" : ""));
+  if (aiOutcome === "completed") await expect(admin.getByText("Human Review Required")).toBeVisible();
+  if (DEMO) await expect(admin.getByText(/\[DEMO MOCK/).first()).toBeVisible();
+  else await expect(admin.getByText(/\[DEMO (MOCK|DRAFT)/)).toHaveCount(0); // no mock substitution on a real-provider deployment
+  await expect(admin.getByText("BookLeaf Staff Reply")).toHaveCount(0); // nothing was sent automatically
 });
-await step("admin inserts draft, edits out the demo label, sends", async () => {
-  await admin.getByRole("button", { name: "Insert Draft into Reply Box" }).click();
-  const box = admin.getByPlaceholder(/Compose reply to author/); await expect(box).toHaveValue(/\[DEMO DRAFT/);
-  const edited = (await box.inputValue()).replace(/\[DEMO DRAFT[^\]]*\]\s*/, ""); await box.fill(edited);
+await step("admin reviews (inserts the draft if there is one), adds approval text and sends explicitly", async () => {
+  const box = admin.getByPlaceholder(/Compose reply to author/);
+  if (aiOutcome === "completed") {
+    await admin.getByRole("button", { name: "Insert Draft into Reply Box" }).click();
+    if (DEMO) await expect(box).toHaveValue(/\[DEMO DRAFT/);
+    await box.fill((await box.inputValue()).replace(/\[DEMO DRAFT[^\]]*\]\s*/, "") + "\n\n" + approved);
+  } else await box.fill(`Thank you for your message. Our team will follow up with you.\n\n${approved}`);
   await admin.getByRole("button", { name: "Send Reply" }).click(); await expect(admin.getByText("BookLeaf Staff Reply")).toBeVisible();
 });
-await step("author receives the admin reply, no label, no internal note (UI)", async () => {
+await step("author receives exactly the approved reply: no AI or demo labels, no internal note (UI)", async () => {
   await author.reload(); await expect(author.getByText("BookLeaf Editorial Support")).toBeVisible();
-  await expect(author.getByText(/royalties are calculated quarterly|Royalties are calculated quarterly/i)).toBeVisible();
-  await expect(author.getByText(/DEMO DRAFT|DEMO MOCK/)).toHaveCount(0); await expect(author.getByText(note)).toHaveCount(0);
+  await expect(author.getByText(approved)).toBeVisible();
+  await expect(author.getByText(/DEMO DRAFT|DEMO MOCK|Rule-based fallback/)).toHaveCount(0); await expect(author.getByText(note)).toHaveCount(0);
 });
 await step("admin downloads the attachment (UI)", async () => { const dl = admin.waitForEvent("download"); await admin.getByRole("button", { name: new RegExp(`Download ${attName}`) }).click(); const d = await dl; if (readFileSync(await d.path(), "utf8") !== attText) throw new Error("mismatch"); });
 await step("author is blocked from admin UI routes", async () => { await author.goto(O + "/admin/queue"); await author.waitForTimeout(1500); if (author.url().includes("/admin/queue") && (await author.getByRole("link", { name: subject }).count()) > 0) throw new Error("author reached admin queue"); });

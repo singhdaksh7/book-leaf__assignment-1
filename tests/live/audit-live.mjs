@@ -67,8 +67,20 @@ let last; for (let i = 0; i < 6; i++) last = await up(`n${i}.txt`, "text/plain",
 check("upload", "per-ticket attachment limit enforced (5)", last.status === 409 || last.status === 400, `status ${last.status}`);
 
 // ---------- Admin queue: filters, inspect, transitions
-r = await admin.req("GET", "/admin/tickets?status=OPEN&pageSize=50");
-check("admin", "queue filter status=OPEN", r.status === 200 && r.json.items.every((t) => t.status === "OPEN") && r.json.items.some((t) => t.id === t1.id), `total=${r.json?.total}`);
+// The open queue spans many pages on a long-lived system and its ordering is intentional (not newest-first), so the new ticket is not
+// necessarily on page 1: walk the pages. Every item on every page must be OPEN, and the new ticket must be found.
+{
+  let found = false, allOpen = true, total, pages = 0, status = 200;
+  for (let page = 1; page <= 50 && !found; page++) {
+    r = await admin.req("GET", `/admin/tickets?status=OPEN&pageSize=100&page=${page}`);
+    status = r.status; if (r.status !== 200) break;
+    pages++; total = r.json.total;
+    allOpen = allOpen && r.json.items.every((t) => t.status === "OPEN");
+    found = r.json.items.some((t) => t.id === t1.id);
+    if (r.json.items.length < 100) break;
+  }
+  check("admin", "queue filter status=OPEN (all pages: only OPEN, new ticket present)", status === 200 && allOpen && found, `total=${total} pagesRead=${pages}`);
+}
 r = await admin.req("GET", "/admin/tickets?priority=HIGH&category=ROYALTY_PAYMENTS");
 check("admin", "queue filter priority+category", r.status === 200 && r.json.items.every((t) => t.priority === "HIGH" && t.category === "ROYALTY_PAYMENTS"), `total=${r.json?.total}`);
 r = await admin.req("GET", "/admin/tickets?authorId=x");
@@ -77,8 +89,14 @@ r = await admin.req("GET", "/admin/tickets?status=NOPE");
 check("admin", "invalid enum filter rejected", r.status === 400, `status ${r.status}`);
 r = await admin.req("GET", `/admin/tickets/${t1.id}`); check("admin", "inspect ticket detail", r.status === 200);
 r = await admin.req("PATCH", `/admin/tickets/${t1.id}`, { body: { status: "IN_PROGRESS", priority: "CRITICAL" } }); check("admin", "change status+priority", r.status === 200, `status ${r.status}`);
+// Documented rule (docs/architecture/08-TICKET-LIFECYCLE.md): only CLOSED is terminal, so reopening IN_PROGRESS -> OPEN is allowed on purpose.
+// The rejection rules that do exist are an unknown status value (400) and any change to a CLOSED ticket (409, covered by closed.mjs).
 r = await admin.req("PATCH", `/admin/tickets/${t1.id}`, { body: { status: "OPEN" } });
-check("admin", "illegal transition IN_PROGRESS->OPEN rejected", r.status === 409 || r.status === 400, `status ${r.status}`);
+check("admin", "reopen IN_PROGRESS->OPEN is allowed (only CLOSED is terminal)", r.status === 200, `status ${r.status}`);
+r = await admin.req("PATCH", `/admin/tickets/${t1.id}`, { body: { status: "IN_PROGRESS" } });
+check("admin", "back to IN_PROGRESS", r.status === 200, `status ${r.status}`);
+r = await admin.req("PATCH", `/admin/tickets/${t1.id}`, { body: { status: "NOT_A_STATUS" } });
+check("admin", "unknown status value rejected", r.status === 400, `status ${r.status}`);
 r = await admin.req("PUT", `/admin/tickets/${t1.id}/assignment`, { body: { assigneeId: adminId } }); check("admin", "assign to self", r.status === 200);
 r = await admin.req("PUT", `/admin/tickets/${t1.id}/assignment`, { body: { assigneeId: (await author.req("GET", "/auth/me")).json.user.id } });
 check("admin", "cannot assign to another user", r.status === 403, `status ${r.status}`);
