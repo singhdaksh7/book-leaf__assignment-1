@@ -1,4 +1,4 @@
-// Drives the AI workflow through the HTTP API. Works against staging (https) or a local container (BASE/ORIGIN env).
+// Drives the AI workflow through the HTTP API. AUTHOR_EMAIL overrides the author (each author may create 30 tickets per hour; this script creates 6). Works against staging (https) or a local container (BASE/ORIGIN env).
 const ORIGIN = (process.env.ORIGIN ?? process.env.BASE_URL ?? "https://bookleaf.77.37.45.177.sslip.io").replace(/\/+$/, "");
 const API = (process.env.BASE ?? ORIGIN) + "/api/v1";
 const { BL_AUTHOR_PW, BL_ADMIN_PW } = process.env;
@@ -20,7 +20,7 @@ class C {
   }
 }
 const author = new C(), admin = new C();
-let r = await author.req("POST", "/auth/login", { email: "synthetic.author1@example.test", password: BL_AUTHOR_PW });
+let r = await author.req("POST", "/auth/login", { email: process.env.AUTHOR_EMAIL ?? "synthetic.author1@example.test", password: BL_AUTHOR_PW });
 check("author login", r.status === 200);
 r = await admin.req("POST", "/auth/login", { email: "admin@example.test", password: BL_ADMIN_PW });
 check("admin login", r.status === 200);
