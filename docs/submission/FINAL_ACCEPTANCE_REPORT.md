@@ -74,3 +74,9 @@ Server-side sessions with HttpOnly, Secure, SameSite cookies; CSRF tokens; origi
 * **Backup and rollback:** fresh encrypted backup `20261016T095733Z` taken after the import and restored in an isolated container (12 tables; users 24, authors 23, books 36, tickets 169, attachments 50; matches live). Attachments: 50 rows, 50 files on the volume. Rollback image `bookleaf-api:12edd72` present. All 16 containers still running; no other project touched.
 * **AI quota:** the OpenRouter `/key` endpoint reports `free_model_daily_requests` 62 used of 50 (0 remaining), account credits 0. No inference calls were made in this pass. Live AI remains **BLOCKED**, not passed. Procedure: `docs/release/API_KEY_ROTATION.md`.
 * **Not done by decision:** synthetic-data cleanup (inventory: `docs/release/CLEANUP_INVENTORY_2026-10-16.md`), admin password rotation, merge to `main`, off-host backup.
+
+## Final release addendum (2026-10-16, after owner approval)
+
+* **Repository** `singhdaksh7/book-leaf__assignment-1` is now PRIVATE (anonymous requests return 404). It had been public until then; a history audit found no credentials, backups, `.env` files, original dataset or assignment PDF in any commit. One placeholder-style phone number that equals AUTH001's number in the dataset appears in a redaction unit test (`packages/ai/tests/security.test.ts`) since an early commit; history was not rewritten.
+* **Dedicated reviewer admin** created through the server admin tool after a fresh encrypted backup (`20261016T101230Z`); the original admin is unchanged. Live checks 17/17: login, queue, stored AI analysis and draft visible, category/priority/status override, internal note, reply sent and received by the author, internal note hidden, original admin still logs in. The application has one staff role (ADMIN), so there is nothing narrower to grant.
+* No OpenRouter requests were made; no synthetic data deleted; no admin password rotated.

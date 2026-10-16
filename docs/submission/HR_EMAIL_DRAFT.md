@@ -1,11 +1,11 @@
 # HR submission email: DRAFT (not sent; the owner must approve before sending)
 
-Before sending: attach the two documents below; send the credentials file (`C:\Users\daksh\.bookleaf-secrets\reviewer-credentials.md`) through a private channel, never in the email body or the repository; decide the branch the reviewer should read; add your phone number.
+Before sending: attach the three files listed below (paths are in the final report) and share the Reviewer Access Guide (kept in the owner's secrets folder, outside Git) only through a private channel, never in the email body. Phone and e-mail come from the resume.
 
 **To:** HR@bookleafpub.in
 **Subject:** Technical Assignment 1 Submission — Daksh Singh | Full-Stack Developer
 
-**Attachments:** `BookLeaf_One_Page_Approach_Daksh_Singh.pdf` (one page), `SOFTWARE_DESIGN_DOCUMENT.pdf` (30 pages)
+**Attachments:** `BookLeaf_One_Page_Approach_Daksh_Singh.pdf` (one page), `SOFTWARE_DESIGN_DOCUMENT.pdf` (30 pages), `system-architecture.png`
 
 ---
 
@@ -14,8 +14,8 @@ Dear BookLeaf Team,
 Please find my submission for Technical Assignment 1, the Author Support and Communication Portal.
 
 **Live demo:** https://bookleaf.77.37.45.177.sslip.io
-**Logins:** the ten authors from your dataset (`AUTH001` to `AUTH010`, with all 18 books) and one admin account. For security I am sending the credentials separately rather than in this email. No API key is needed to use the demo.
-**Code:** private GitHub repository `singhdaksh7/book-leaf__assignment-1`, branch `integration/bookleaf-fullstack`. Please send me the GitHub usernames of the reviewers and I will grant read access immediately. The README has a short reviewer quick start.
+**Logins:** a dedicated reviewer admin account and the ten authors from your dataset (`AUTH001` to `AUTH010`, with all 18 books). Because the logins contain passwords, they are in a separate Reviewer Access Guide that I will share through a private channel, not in this email. No API key is needed to use the demo.
+**Code:** private GitHub repository `singhdaksh7/book-leaf__assignment-1`, branch `main`. The repository is private; please send me the GitHub usernames of the reviewers and I will grant read access immediately. The README has a short reviewer quick start.
 
 **What it does.** Authors register or log in, see their books with exact royalty figures and production status, and raise general or book-linked tickets with attachments. Admins work a queue with search and filters, assignment, internal notes, status changes and an audit history. For each ticket the AI classifies the category, scores the priority and drafts a reply grounded in your policies (80/20 split, quarterly payments within 45 days, the Rs 1,000 threshold, ISBN escalation, printing and distribution timelines). The admin edits and explicitly sends it; nothing is ever sent automatically.
 
@@ -29,5 +29,5 @@ I am happy to walk you through the system at any time.
 
 Kind regards,
 Daksh Singh
-manavdaksh7@gmail.com
-[phone]
+singhdaksh9760@gmail.com
++91 97609 42003
