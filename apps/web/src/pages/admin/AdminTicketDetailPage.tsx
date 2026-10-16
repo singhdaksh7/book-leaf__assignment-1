@@ -40,6 +40,7 @@ import { Select } from "../../components/common/Select";
 import { Card, CardHeader, CardContent } from "../../components/common/Card";
 import { Skeleton } from "../../components/common/Skeleton";
 import { Alert } from "../../components/common/Alert";
+import { AiFailureNotice } from "../../components/admin/AiFailureNotice";
 
 export const AdminTicketDetailPage: React.FC = () => {
   const { ticketId } = useParams<{ ticketId: string }>();
@@ -725,6 +726,8 @@ export const AdminTicketDetailPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+            ) : aiAnalysis?.status === "FAILED" ? (
+              <AiFailureNotice errorCode={aiAnalysis.errorCode} />
             ) : aiAnalysis?.status === "PENDING" ? (
               <div className="p-4 bg-slate-800/60 rounded text-center text-xs text-slate-400 animate-pulse">
                 AI background analysis job currently pending...
