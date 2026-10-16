@@ -8,8 +8,8 @@ flowchart LR
     end
     KEY[/"OPENROUTER_API_KEY<br/>server-side env only (infra/.env, mode 600)"/]
     OR(["openrouter.ai/api/v1<br/>free endpoint, price 0"])
-    subgraph DEMO["OPTIONAL demonstration only<br/>(infra/docker-compose.demo.yml + MOCK_AI_ACK=demonstration-only)"]
-        MOCK["mock-ai on 127.0.0.1:8080<br/>canned [DEMO MOCK] text, no inference<br/>supervised inside the api container"]
+    subgraph DEMO["OPTIONAL: demo only"]
+        MOCK["mock-ai on 127.0.0.1:8080<br/>canned [DEMO MOCK] text, no inference<br/>needs docker-compose.demo.yml<br/>and MOCK_AI_ACK=demonstration-only<br/>runs inside the api container"]
     end
     KEY --> SVC
     DEFAULT --> SVC

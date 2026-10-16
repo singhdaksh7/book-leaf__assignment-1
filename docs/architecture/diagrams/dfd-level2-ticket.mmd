@@ -23,15 +23,15 @@ flowchart TB
     AU -- "reply body" --> R --> D3
     AD --> Q
     Q -- "filters" --> D3
-    AD -- "new status or category" --> S --> D3
-    AD -- "reply text (edited from AI draft or typed)" --> RP --> D3
-    AD -- "note text" --> N --> D4
-    AD -- "assignee = self" --> AS --> D4
+    AD -- "status, category" --> S --> D3
+    AD -- "reply text" --> RP --> D3
+    AD -- "note" --> N --> D4
+    AD -- "self" --> AS --> D4
     S --> D4
     C --> EV
     R --> EV
     S --> EV
     RP --> EV
     N --> EV
-    EV -- "author: audience all, own tickets" --> AU
-    EV -- "admin: everything" --> AD
+    EV -- "own tickets" --> AU
+    EV -- "all tickets" --> AD

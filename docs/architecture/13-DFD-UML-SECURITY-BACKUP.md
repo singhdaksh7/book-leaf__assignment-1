@@ -95,18 +95,18 @@ flowchart TB
     AU -- "reply body" --> R --> D3
     AD --> Q
     Q -- "filters" --> D3
-    AD -- "new status or category" --> S --> D3
-    AD -- "reply text (edited from AI draft or typed)" --> RP --> D3
-    AD -- "note text" --> N --> D4
-    AD -- "assignee = self" --> AS --> D4
+    AD -- "status, category" --> S --> D3
+    AD -- "reply text" --> RP --> D3
+    AD -- "note" --> N --> D4
+    AD -- "self" --> AS --> D4
     S --> D4
     C --> EV
     R --> EV
     S --> EV
     RP --> EV
     N --> EV
-    EV -- "author: audience all, own tickets" --> AU
-    EV -- "admin: everything" --> AD
+    EV -- "own tickets" --> AU
+    EV -- "all tickets" --> AD
 ```
 
 ## 13.4 DFD Level 2: AI workflow (process 4)
@@ -294,8 +294,8 @@ flowchart LR
     end
     KEY[/"OPENROUTER_API_KEY<br/>server-side env only (infra/.env, mode 600)"/]
     OR(["openrouter.ai/api/v1<br/>free endpoint, price 0"])
-    subgraph DEMO["OPTIONAL demonstration only<br/>(infra/docker-compose.demo.yml + MOCK_AI_ACK=demonstration-only)"]
-        MOCK["mock-ai on 127.0.0.1:8080<br/>canned [DEMO MOCK] text, no inference<br/>supervised inside the api container"]
+    subgraph DEMO["OPTIONAL: demo only"]
+        MOCK["mock-ai on 127.0.0.1:8080<br/>canned [DEMO MOCK] text, no inference<br/>needs docker-compose.demo.yml<br/>and MOCK_AI_ACK=demonstration-only<br/>runs inside the api container"]
     end
     KEY --> SVC
     DEFAULT --> SVC
