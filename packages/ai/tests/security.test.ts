@@ -7,7 +7,7 @@ import { createOpenRouterProvider } from "../src/provider/openrouter.js";
 import { KB_CHUNKS } from "../src/knowledge/chunks.js";
 import { asFetch, capturingLogger, classifyContent, draftContent, FAKE_KEY, jsonResponse, mockFetch, modelAnswer, okEnvelope, scriptedProvider, testConfig } from "./helpers.js";
 
-const author = { name: "Jane Roe", email: "jane.roe@example.test", phone: "+91 98765 43210", city: "Pune" };
+const author = { name: "Jane Roe", email: "jane.roe@example.test", phone: "+91 90000 11122", city: "Pune" };
 const base = { ticketId: "t1", subject: "Royalty", description: "I have not received my royalty.", authorContext: author };
 const CLEAN_DRAFT = "I'm sorry for the worry. Royalties are calculated quarterly and paid within 45 days of the quarter ending. Our team will review your account and follow up with you.";
 
@@ -192,8 +192,8 @@ describe("model output cannot trigger side effects", () => {
 describe("PII stays out of provider prompts", () => {
   const pii = {
     ...base,
-    description: "Please pay me. My email is jane.roe@example.test, call +91 98765 43210, bank account 123456789012, card 4111 1111 1111 1111. ISBN 978-93-5123-456-7 is wrong.",
-    history: [{ author: "AUTHOR" as const, body: "Reach me on 9876543210 or jane.roe@example.test" }],
+    description: "Please pay me. My email is jane.roe@example.test, call +91 90000 11122, bank account 123456789012, card 4111 1111 1111 1111. ISBN 978-93-5123-456-7 is wrong.",
+    history: [{ author: "AUTHOR" as const, body: "Reach me on 9000011122 or jane.roe@example.test" }],
     bookContext: { title: "My Book", isbn: "978-93-5123-456-7", status: "Published", royaltyPending: 2500, mrp: 499 }
   };
   it("redacts emails, phone numbers and account/card numbers from every prompt, keeping the ISBN and amounts", async () => {
@@ -201,20 +201,20 @@ describe("PII stays out of provider prompts", () => {
     await createAiService({ provider }).analyzeTicket(pii as never);
     for (const call of provider.calls) {
       const all = call.system + call.user;
-      for (const secret of ["jane.roe@example.test", "98765 43210", "9876543210", "123456789012", "4111", "Jane", "Roe", "Pune"]) expect(all).not.toContain(secret);
+      for (const secret of ["jane.roe@example.test", "90000 11122", "9000011122", "123456789012", "4111", "Jane", "Roe", "Pune"]) expect(all).not.toContain(secret);
       expect(call.user).toContain("[email]");
       expect(call.user).toContain("978-93-5123-456-7");
     }
   });
   it("redactPii unit behaviour", () => {
     expect(redactPii("mail a@b.co now")).toBe("mail [email] now");
-    expect(redactPii("call 98765 43210 or +91-98765-43210")).toBe("call [number] or [number]");
+    expect(redactPii("call 90000 11122 or +91-90000-11122")).toBe("call [number] or [number]");
     expect(redactPii("ISBN 9789351234567 and 978-93-5123-456-7")).toBe("ISBN 9789351234567 and 978-93-5123-456-7");
     expect(redactPii("paid on 2025-12-15, ₹1,00,000 sold 200 copies")).toBe("paid on 2025-12-15, ₹1,00,000 sold 200 copies");
   });
   it("fallback result and metadata contain no prompt text or author contact data", async () => {
     const outcome = await createAiService({ provider: scriptedProvider(new Error("x")) }).analyzeTicketDetailed(pii as never);
-    expect(JSON.stringify(outcome)).not.toMatch(/example\.test|98765|123456789012|4111/);
+    expect(JSON.stringify(outcome)).not.toMatch(/example\.test|90000|123456789012|4111/);
   });
 });
 

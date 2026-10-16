@@ -29,5 +29,4 @@ I am happy to walk you through the system at any time.
 
 Kind regards,
 Daksh Singh
-singhdaksh9760@gmail.com
-+91 97609 42003
+[contact e-mail and phone exactly as on the resume; omitted here because this repository is public]

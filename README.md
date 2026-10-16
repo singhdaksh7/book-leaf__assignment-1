@@ -11,7 +11,7 @@ A full-stack author support portal: authors register themselves, browse their bo
 ## Reviewer quick start
 
 1. Open https://bookleaf.77.37.45.177.sslip.io. Credentials come in the separate Reviewer Access Guide (PDF/DOCX, not in this repository): a dedicated reviewer admin account, plus ten author logins (`AUTH001`-`AUTH010`, the assignment's 10 authors and 18 books `BK001`-`BK018`). Everyone signs in at `/login`; the admin lands on `/admin/queue`.
-2. **Author portal:** sign in as any author (for example Priya Sharma, `AUTH001`, books `BK001` and `BK002`). Check Dashboard and My Books (exact royalty figures, `BK002` has nothing pending; `BK013` (Sneha Kulkarni, `AUTH007`, Cover Design) and `BK015` (Kavita Deshmukh, `AUTH009`, Typesetting) are still in production with zero royalty), open a book, then raise a general or book-linked ticket with an attachment. Each author sees only their own books and tickets. You can also register a brand-new author at `/register`.
+2. **Author portal:** sign in as any author (for example `AUTH001`, books `BK001` and `BK002`). Check Dashboard and My Books (exact royalty figures, `BK002` has nothing pending; `BK013` (`AUTH007`, Cover Design) and `BK015` (`AUTH009`, Typesetting) are still in production with zero royalty), open a book, then raise a general or book-linked ticket with an attachment. Each author sees only their own books and tickets. You can also register a brand-new author at `/register`.
 3. **Admin portal:** sign in as the reviewer admin, open the ticket queue (search, filters, category, priority), open your ticket, assign it, add an internal note, change the status, reply, and watch the reply appear on the author side without refreshing.
 4. **AI:** the "AI analysis" panel classifies, scores priority and drafts a reply for the admin to edit and send. On the live site the free OpenRouter daily quota is exhausted at the time of writing, so analysis shows a clear rate-limit notice and replies are written manually (manual reply always works). The AI path is covered by tests and by real local runs; see the AI status paragraph above.
 5. The admin queue also contains older synthetic test tickets (inventory: `docs/release/CLEANUP_INVENTORY_2026-10-16.md`); they are labelled by the test data and were left in place deliberately.
@@ -45,6 +45,23 @@ npm run seed:synthetic --workspace @bookleaf/db
 npm run dev                                    # API on :3000
 $env:VITE_USE_MOCKS="false"; $env:VITE_API_BASE_URL="http://localhost:3000/api/v1"; npm run dev:web   # web on :5173
 ```
+
+macOS / Linux (bash) equivalent:
+
+```bash
+npm install
+cp apps/api/.env.example apps/api/.env          # then edit DATABASE_URL, SESSION_SECRET (32+ random chars), WEB_ORIGIN
+cp packages/db/.env.example packages/db/.env
+npm run build
+npm run migrate:deploy --workspace @bookleaf/db
+export BOOKLEAF_SEED_AUTHOR_PASSWORD="choose-a-demo-password"
+export BOOKLEAF_SEED_ADMIN_EMAIL="admin@example.test" BOOKLEAF_SEED_ADMIN_PASSWORD="choose-another-password"
+npm run seed:synthetic --workspace @bookleaf/db
+npm run dev                                      # API on :3000
+VITE_USE_MOCKS=false VITE_API_BASE_URL=http://localhost:3000/api/v1 npm run dev:web   # web on :5173
+```
+
+The AI works without a key: leave `OPENROUTER_API_KEY` empty and tickets fall back to manual replies. To use the real model, set `OPENROUTER_API_KEY` in `apps/api/.env` (server side only; free `:free` model ids only). No secret is ever committed: every `.env.example` contains placeholders. The tests need no database or key (`npm test` starts a throwaway PostgreSQL). The production Docker stack is described in [infra/DEPLOY.md](infra/DEPLOY.md).
 
 `WEB_ORIGIN` must exactly equal the browser origin (default `http://localhost:5173`). Locally, either register a new author at `/register` or sign in with the synthetic `synthetic.authorN@example.test` addresses. Rebuild `@bookleaf/db` / `@bookleaf/ai` after editing them; on Windows stop the running API first (it locks the Prisma engine DLL and `prisma generate` fails with EPERM).
 

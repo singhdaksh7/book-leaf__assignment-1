@@ -168,7 +168,7 @@ test.describe("mobile (375x812)", () => {
     }
     expect((await page.getByRole("button", { name: "Create account" }).boundingBox())!.height).toBeGreaterThanOrEqual(40);
 
-    await fillRegistration(page, email, "Meera Nair");
+    await fillRegistration(page, email, "Test Registrant");
     await page.getByRole("button", { name: "Create account" }).tap();
     await expect(page).toHaveURL(/\/dashboard$/, { timeout: 10_000 });
     const after = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
