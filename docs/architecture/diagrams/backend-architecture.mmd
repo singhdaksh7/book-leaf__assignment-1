@@ -1,0 +1,56 @@
+%% file: backend-architecture.mmd
+flowchart TB
+    CL["Clients: author and admin browsers via Traefik"]
+
+    subgraph L1["Layer 1 - Transport and cross-cutting middleware (app.ts)"]
+        direction LR
+        M1["withRequestId<br/>X-Request-Id"] --> M2["accessLog<br/>method, path, status, ms, userId"] --> M3["helmet"] --> M4["cors<br/>origin = WEB_ORIGIN"] --> M5["express.json 100 kB"] --> M6["cookie-parser"]
+    end
+
+    subgraph L2["Layer 2 - Security middleware on /api/v1"]
+        direction LR
+        S1["noStore<br/>Cache-Control: no-store"] --> S2["authenticate<br/>cookie -> session -> req.auth"] --> S3["csrfProtection<br/>Origin + X-CSRF-Token on mutating requests"]
+    end
+
+    subgraph L3["Layer 3 - Routers (HTTP controllers)"]
+        direction LR
+        R1["/auth<br/>login, logout, me"]
+        R2["/author<br/>requireAuthor"]
+        R3["/admin<br/>requireRole ADMIN"]
+        R4["/events<br/>requireAuth, SSE"]
+    end
+
+    subgraph L4["Layer 4 - Domain rules and services"]
+        direction LR
+        D1["tickets/transitions<br/>tickets/filters"]
+        D2["attachments/validate<br/>attachments/storage"]
+        D3["ai/attempts (AiAttemptService)<br/>ai/engine, ai/context"]
+        D4["events/hub<br/>(TicketEventHub)"]
+        D5["auth/sessions<br/>auth/rateLimit"]
+        D6["serializers<br/>(DTO + Zod parse)"]
+    end
+
+    subgraph L5["Layer 5 - Data access"]
+        direction LR
+        P1["Prisma Client<br/>@bookleaf/db"]
+        P2["$queryRaw row locks<br/>FOR UPDATE / FOR SHARE"]
+        P3["LocalDiskStorage"]
+    end
+
+    subgraph L6["Layer 6 - Persistence"]
+        direction LR
+        PG[("PostgreSQL 16<br/>checks, triggers,<br/>partial unique index")]
+        VOL[("attachments volume")]
+    end
+
+    CT["@bookleaf/contracts<br/>Zod schemas used by routers and serializers"]
+    AI["@bookleaf/ai<br/>classifier, drafter, provider client"]
+    EH["Central error handler<br/>AppError -> JSON error body"]
+
+    CL --> L1 --> L2 --> L3 --> L4 --> L5
+    P1 --> PG
+    P2 --> PG
+    P3 --> VOL
+    L3 -. "validate in/out" .-> CT
+    D3 --> AI
+    L3 -. "throw AppError" .-> EH

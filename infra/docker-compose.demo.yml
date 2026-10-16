@@ -1,0 +1,27 @@
+# OPT-IN, DEMONSTRATION-ONLY AI for a staging stack. Never use for a real deployment.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.demo.yml up -d --no-build --no-deps api
+#
+# Runs infra/mock-ai/server.mjs (canned, keyword-matched, labelled [DEMO MOCK] / [DEMO DRAFT]; no AI inference) as a supervised
+# background process INSIDE the API container and points the API at it on loopback, which is the only place the AI package accepts
+# plain http. Because it lives in the API container it shares the API's lifecycle: recreating, restarting or crash-restarting the
+# API always brings the mock back with it. (A separate container sharing the API's network namespace cannot do this: it stays pinned
+# to the old API container and is stranded when the API is recreated.)
+#
+# The demo settings live here, not in .env, so the demo cannot be half-enabled and a real OPENROUTER_API_KEY can never be combined
+# with the mock. Dropping this file from the command line (and recreating the API) returns to the normal configuration.
+services:
+  api:
+    command:
+      - sh
+      - -c
+      # The loop restarts the mock if it ever crashes; `exec` keeps the API as PID 1 so it still receives stop signals.
+      - 'while true; do node /mock-ai/server.mjs; sleep 2; done & exec node dist/server.js'
+    environment:
+      MOCK_AI_ACK: demonstration-only
+      MOCK_AI_PORT: "8080"
+      OPENROUTER_BASE_URL: http://127.0.0.1:8080/api/v1
+      OPENROUTER_API_KEY: demo-not-a-real-key
+      OPENROUTER_MODEL: demo/mock-not-a-real-model
+    volumes:
+      - ./mock-ai:/mock-ai:ro

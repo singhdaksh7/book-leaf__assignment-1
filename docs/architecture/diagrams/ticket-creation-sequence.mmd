@@ -1,0 +1,28 @@
+%% file: ticket-creation-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant AU as Author browser
+    participant API as POST /author/tickets
+    participant DB as PostgreSQL
+    participant AI as AiAttemptService
+    participant HUB as TicketEventHub
+    participant AD as Admin SSE streams
+
+    AU->>API: {bookId or null, subject, description} + cookie + CSRF
+    API->>API: requireAuthor, Zod validation (400 on failure)
+    API->>API: creation limiter: 30 per hour per user, else 429
+    API->>DB: BEGIN
+    opt bookId is not null
+        API->>DB: SELECT Book WHERE id AND authorId = me FOR SHARE
+        DB-->>API: row or none (none: 404 "Book not found")
+    end
+    API->>DB: INSERT Ticket (status OPEN, category NULL, priority NULL, assignee NULL)
+    API->>AI: enqueue(tx, ticketId)
+    AI->>DB: INSERT AiAnalysis status PENDING (same transaction)
+    API->>DB: COMMIT
+    API->>HUB: publish ticket.created (audience all, version = updatedAt)
+    HUB-->>AD: event delivered to admins and to the owning author
+    API->>AI: kick(attemptId), runs in the background
+    API-->>AU: 201 {ticket}
+    Note over API,AI: The PENDING attempt commits with the ticket, so a crash cannot lose the analysis request. No AuditLog row is written for creation.
+    Note over AU,API: The web client then uploads each selected attachment with separate requests.

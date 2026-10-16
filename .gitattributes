@@ -1,0 +1,5 @@
+*.sh text eol=lf
+*.cron.example text eol=lf
+infra/mock-ai/*.mjs text eol=lf
+Dockerfile text eol=lf
+*.Dockerfile text eol=lf

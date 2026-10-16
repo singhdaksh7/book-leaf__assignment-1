@@ -1,0 +1,448 @@
+[
+  {
+    "author_id": "SYN-A001",
+    "name": "Synthetic Author 1",
+    "email": "synthetic.author1@example.test",
+    "phone": "+00-000-000-1001",
+    "city": "Samplepur",
+    "joined_date": "2024-02-02",
+    "books": [
+      {
+        "book_id": "SYN-B001",
+        "title": "Synthetic Book 1",
+        "isbn": "000-0-00000-001-0",
+        "genre": "Non-Fiction",
+        "publication_date": "2025-02-11",
+        "status": "Published",
+        "mrp": 210,
+        "author_royalty_per_copy": 42,
+        "total_copies_sold": 25,
+        "total_royalty_earned": 1050,
+        "royalty_paid": 1050,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": "2026-02-05",
+        "print_partner": "Mockprint Ltd",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      },
+      {
+        "book_id": "SYN-B002",
+        "title": "Synthetic Book 2",
+        "isbn": "000-0-00000-002-0",
+        "genre": "Poetry",
+        "publication_date": "2025-03-12",
+        "status": "Published",
+        "mrp": 220,
+        "author_royalty_per_copy": 44,
+        "total_copies_sold": 50,
+        "total_royalty_earned": 2200,
+        "royalty_paid": 1100,
+        "royalty_pending": 1100,
+        "last_royalty_payout_date": "2026-03-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A002",
+    "name": "Synthetic Author 2",
+    "email": "synthetic.author2@example.test",
+    "phone": "+00-000-000-1002",
+    "city": "Mockton",
+    "joined_date": "2024-03-03",
+    "books": [
+      {
+        "book_id": "SYN-B003",
+        "title": "Synthetic Book 3",
+        "isbn": "000-0-00000-003-0",
+        "genre": "Memoir",
+        "publication_date": "2025-04-13",
+        "status": "Published",
+        "mrp": 230,
+        "author_royalty_per_copy": 46,
+        "total_copies_sold": 0,
+        "total_royalty_earned": 0,
+        "royalty_paid": 0,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": null,
+        "print_partner": "Mockprint Ltd",
+        "available_on": [
+          "Synthetic Store"
+        ]
+      },
+      {
+        "book_id": "SYN-B004",
+        "title": "Synthetic Book 4",
+        "isbn": "000-0-00000-004-0",
+        "genre": "Fiction",
+        "publication_date": "2025-05-14",
+        "status": "Published",
+        "mrp": 240,
+        "author_royalty_per_copy": 48,
+        "total_copies_sold": 100,
+        "total_royalty_earned": 4800,
+        "royalty_paid": 2400,
+        "royalty_pending": 2400,
+        "last_royalty_payout_date": "2026-05-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A003",
+    "name": "Synthetic Author 3",
+    "email": "synthetic.author3@example.test",
+    "phone": "+00-000-000-1003",
+    "city": "Fixtureburg",
+    "joined_date": "2024-04-04",
+    "books": [
+      {
+        "book_id": "SYN-B005",
+        "title": "Synthetic Book 5",
+        "isbn": "000-0-00000-005-0",
+        "genre": "Non-Fiction",
+        "publication_date": null,
+        "status": "In Production",
+        "mrp": null,
+        "author_royalty_per_copy": null,
+        "total_copies_sold": 0,
+        "total_royalty_earned": 0,
+        "royalty_paid": 0,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": null,
+        "print_partner": null,
+        "available_on": []
+      },
+      {
+        "book_id": "SYN-B006",
+        "title": "Synthetic Book 6",
+        "isbn": "000-0-00000-006-0",
+        "genre": "Poetry",
+        "publication_date": "2025-07-16",
+        "status": "Published",
+        "mrp": 260,
+        "author_royalty_per_copy": 52,
+        "total_copies_sold": 150,
+        "total_royalty_earned": 7800,
+        "royalty_paid": 3900,
+        "royalty_pending": 3900,
+        "last_royalty_payout_date": "2026-07-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A004",
+    "name": "Synthetic Author 4",
+    "email": "synthetic.author4@example.test",
+    "phone": "+00-000-000-1004",
+    "city": "Demoabad",
+    "joined_date": "2024-05-05",
+    "books": [
+      {
+        "book_id": "SYN-B007",
+        "title": "Synthetic Book 7",
+        "isbn": "000-0-00000-007-0",
+        "genre": "Memoir",
+        "publication_date": "2025-08-17",
+        "status": "Published",
+        "mrp": 270,
+        "author_royalty_per_copy": 54,
+        "total_copies_sold": 175,
+        "total_royalty_earned": 9450,
+        "royalty_paid": 9450,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": "2026-08-05",
+        "print_partner": "Mockprint Ltd",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      },
+      {
+        "book_id": "SYN-B008",
+        "title": "Synthetic Book 8",
+        "isbn": "000-0-00000-008-0",
+        "genre": "Fiction",
+        "publication_date": "2025-09-18",
+        "status": "Published",
+        "mrp": 280,
+        "author_royalty_per_copy": 56,
+        "total_copies_sold": 200,
+        "total_royalty_earned": 11200,
+        "royalty_paid": 5600,
+        "royalty_pending": 5600,
+        "last_royalty_payout_date": "2026-09-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A005",
+    "name": "Synthetic Author 5",
+    "email": "synthetic.author5@example.test",
+    "phone": "+00-000-000-1005",
+    "city": "Testville",
+    "joined_date": "2024-06-06",
+    "books": [
+      {
+        "book_id": "SYN-B009",
+        "title": "Synthetic Book 9",
+        "isbn": "000-0-00000-009-0",
+        "genre": "Non-Fiction",
+        "publication_date": "2025-01-10",
+        "status": "Published",
+        "mrp": 290,
+        "author_royalty_per_copy": 58,
+        "total_copies_sold": 225,
+        "total_royalty_earned": 13050,
+        "royalty_paid": 13050,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": "2026-01-05",
+        "print_partner": "Mockprint Ltd",
+        "available_on": [
+          "Synthetic Store"
+        ]
+      },
+      {
+        "book_id": "SYN-B010",
+        "title": "Synthetic Book 10",
+        "isbn": "000-0-00000-010-0",
+        "genre": "Poetry",
+        "publication_date": null,
+        "status": "In Production",
+        "mrp": null,
+        "author_royalty_per_copy": null,
+        "total_copies_sold": 0,
+        "total_royalty_earned": 0,
+        "royalty_paid": 0,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": null,
+        "print_partner": null,
+        "available_on": []
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A006",
+    "name": "Synthetic Author 6",
+    "email": "synthetic.author6@example.test",
+    "phone": "+00-000-000-1006",
+    "city": "Samplepur",
+    "joined_date": "2024-07-07",
+    "books": [
+      {
+        "book_id": "SYN-B011",
+        "title": "Synthetic Book 11",
+        "isbn": "000-0-00000-011-0",
+        "genre": "Memoir",
+        "publication_date": "2025-03-12",
+        "status": "Published",
+        "mrp": 310,
+        "author_royalty_per_copy": 62,
+        "total_copies_sold": 275,
+        "total_royalty_earned": 17050,
+        "royalty_paid": 17050,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": "2026-03-05",
+        "print_partner": "Mockprint Ltd",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      },
+      {
+        "book_id": "SYN-B012",
+        "title": "Synthetic Book 12",
+        "isbn": "000-0-00000-012-0",
+        "genre": "Fiction",
+        "publication_date": "2025-04-13",
+        "status": "Published",
+        "mrp": 320,
+        "author_royalty_per_copy": 64,
+        "total_copies_sold": 300,
+        "total_royalty_earned": 19200,
+        "royalty_paid": 9600,
+        "royalty_pending": 9600,
+        "last_royalty_payout_date": "2026-04-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A007",
+    "name": "Synthetic Author 7",
+    "email": "synthetic.author7@example.test",
+    "phone": "+00-000-000-1007",
+    "city": "Mockton",
+    "joined_date": "2024-08-08",
+    "books": [
+      {
+        "book_id": "SYN-B013",
+        "title": "Synthetic Book 13",
+        "isbn": "000-0-00000-013-0",
+        "genre": "Non-Fiction",
+        "publication_date": "2025-05-14",
+        "status": "Published",
+        "mrp": 330,
+        "author_royalty_per_copy": 66,
+        "total_copies_sold": 325,
+        "total_royalty_earned": 21450,
+        "royalty_paid": 21450,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": "2026-05-05",
+        "print_partner": "Mockprint Ltd",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      },
+      {
+        "book_id": "SYN-B014",
+        "title": "Synthetic Book 14",
+        "isbn": "000-0-00000-014-0",
+        "genre": "Poetry",
+        "publication_date": "2025-06-15",
+        "status": "Published",
+        "mrp": 340,
+        "author_royalty_per_copy": 68,
+        "total_copies_sold": 350,
+        "total_royalty_earned": 23800,
+        "royalty_paid": 11900,
+        "royalty_pending": 11900,
+        "last_royalty_payout_date": "2026-06-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A008",
+    "name": "Synthetic Author 8",
+    "email": "synthetic.author8@example.test",
+    "phone": "+00-000-000-1008",
+    "city": "Fixtureburg",
+    "joined_date": "2024-09-01",
+    "books": [
+      {
+        "book_id": "SYN-B015",
+        "title": "Synthetic Book 15",
+        "isbn": "000-0-00000-015-0",
+        "genre": "Memoir",
+        "publication_date": null,
+        "status": "In Production",
+        "mrp": null,
+        "author_royalty_per_copy": null,
+        "total_copies_sold": 0,
+        "total_royalty_earned": 0,
+        "royalty_paid": 0,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": null,
+        "print_partner": null,
+        "available_on": []
+      },
+      {
+        "book_id": "SYN-B016",
+        "title": "Synthetic Book 16",
+        "isbn": "000-0-00000-016-0",
+        "genre": "Fiction",
+        "publication_date": "2025-08-17",
+        "status": "Published",
+        "mrp": 360,
+        "author_royalty_per_copy": 72,
+        "total_copies_sold": 400,
+        "total_royalty_earned": 28800,
+        "royalty_paid": 14400,
+        "royalty_pending": 14400,
+        "last_royalty_payout_date": "2026-08-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A009",
+    "name": "Synthetic Author 9",
+    "email": "synthetic.author9@example.test",
+    "phone": "+00-000-000-1009",
+    "city": "Demoabad",
+    "joined_date": "2024-01-02",
+    "books": [
+      {
+        "book_id": "SYN-B017",
+        "title": "Synthetic Book 17",
+        "isbn": "000-0-00000-017-0",
+        "genre": "Non-Fiction",
+        "publication_date": "2025-09-18",
+        "status": "Published",
+        "mrp": 370,
+        "author_royalty_per_copy": 74,
+        "total_copies_sold": 0,
+        "total_royalty_earned": 0,
+        "royalty_paid": 0,
+        "royalty_pending": 0,
+        "last_royalty_payout_date": null,
+        "print_partner": "Mockprint Ltd",
+        "available_on": [
+          "Synthetic Store",
+          "Demo Marketplace"
+        ]
+      }
+    ]
+  },
+  {
+    "author_id": "SYN-A010",
+    "name": "Synthetic Author 10",
+    "email": "synthetic.author10@example.test",
+    "phone": "+00-000-000-1010",
+    "city": "Testville",
+    "joined_date": "2024-02-03",
+    "books": [
+      {
+        "book_id": "SYN-B018",
+        "title": "Synthetic Book 18",
+        "isbn": "000-0-00000-018-0",
+        "genre": "Poetry",
+        "publication_date": "2025-01-10",
+        "status": "Published",
+        "mrp": 380,
+        "author_royalty_per_copy": 76,
+        "total_copies_sold": 450,
+        "total_royalty_earned": 34200,
+        "royalty_paid": 17100,
+        "royalty_pending": 17100,
+        "last_royalty_payout_date": "2026-01-05",
+        "print_partner": "Synthetic Print Co",
+        "available_on": [
+          "Synthetic Store"
+        ]
+      }
+    ]
+  }
+]

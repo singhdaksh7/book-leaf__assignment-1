@@ -1,0 +1,38 @@
+%% file: ai-classification-sequence.mmd
+sequenceDiagram
+    autonumber
+    participant S as AiAttemptService
+    participant E as AiEngine adapter
+    participant C as Classifier
+    participant K as Keyword retriever
+    participant P as OpenRouterProvider
+    participant M as Model provider (OpenRouter, or demo mock on staging)
+
+    S->>S: buildInput (ticket, first name, minimised book, last 2 AUTHOR messages)
+    S->>E: run(input)
+    E->>C: classify(subject, description, history, bookContext)
+    C->>C: detectInjection(ticket text + history) gives securityFlags
+    C->>K: retrieve(policy and overview chunks, max 3 / 2 400 chars)
+    K-->>C: chunks with ids
+    C->>C: build prompt (static system prompt, sanitised untrusted blocks, whitelisted book facts)
+    C->>P: complete(purpose classify, temperature 0, max 250 tokens)
+    loop up to maxRetries + 1 per model (primary, then optional fallback model)
+        P->>M: POST /chat/completions (Bearer key, JSON object, usage included)
+        alt 2xx with usable envelope
+            M-->>P: content + usage (tokens, cost)
+        else 429, 408, 5xx, timeout, network error
+            P->>P: wait exponential backoff with jitter, honour Retry-After, retry
+        else 401 or 403, other 4xx, unreadable or empty body
+            P-->>C: AiUnavailableError (AI_NOT_CONFIGURED or AI_PROVIDER_ERROR or AI_INVALID_OUTPUT), no retry
+        end
+    end
+    P-->>C: completion or error
+    alt provider error
+        C-->>E: heuristic result, providerFailed = true (draft step will be skipped)
+    else completion
+        C->>C: parse JSON against schema, category and priority enums, confidence 0..1
+        C->>C: every cited id must be among the offered chunks
+        C->>C: findUnsupportedClaims and findUnsafeMarkup on the rationale
+        C->>C: priority = max(model priority, policy floor), confidence capped 0.6 if injection flagged
+        C-->>E: model classification (or heuristic with AI_INVALID_OUTPUT / AI_UNGROUNDED_OUTPUT)
+    end

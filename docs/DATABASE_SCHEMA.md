@@ -7,7 +7,7 @@ This is a schema baseline only: no migration, database connection, seed implemen
 | Model | Purpose and key relationships |
 | --- | --- |
 | `User` | Login identity, role (`AUTHOR`/`ADMIN`), password hash. Has optional one-to-one `AuthorProfile`, sessions, authored messages/notes, assignments, audit events. |
-| `AuthorProfile` | Supplied author identity/contact fields. Belongs to one user; has books and tickets. |
+| `AuthorProfile` | Author identity/contact fields: supplied by the dataset, or created by public self-registration (`externalAuthorId` `WEB-<hex>`, empty `phone`/`city`, no books). Belongs to one user; has books and tickets. No schema change was needed for registration. |
 | `Book` | Exact supplied book data including nullable source values and `availableOn`. Belongs to one author; may be linked by tickets. |
 | `Session` | Hashed opaque token, user, expiry and creation date. |
 | `Ticket` | Author-owned support unit; optional book supports General/Account Level tickets; lifecycle/status/category/priority/assignee and timestamps. |

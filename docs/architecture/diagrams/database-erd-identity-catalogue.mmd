@@ -1,0 +1,36 @@
+%% file: database-erd-identity-catalogue.mmd
+erDiagram
+    User ||--o| AuthorProfile : "has profile - Cascade"
+    User ||--o{ Session : "owns - Cascade"
+    AuthorProfile ||--o{ Book : "owns - Restrict"
+    User {
+        string id PK
+        string email UK
+        string passwordHash
+        UserRole role
+    }
+    AuthorProfile {
+        string id PK
+        string userId FK, UK
+        string externalAuthorId UK
+        string name
+        string phone
+        string city
+        date joinedDate
+    }
+    Book {
+        string id PK
+        string externalBookId UK
+        string authorId FK
+        string title
+        string isbn
+        string status
+        int totalRoyaltyEarned
+        int royaltyPending
+    }
+    Session {
+        string id PK
+        string tokenHash UK
+        string userId FK
+        datetime expiresAt
+    }

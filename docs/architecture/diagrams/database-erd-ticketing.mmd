@@ -1,0 +1,48 @@
+%% file: database-erd-ticketing.mmd
+erDiagram
+    AuthorProfile ||--o{ Ticket : "raises - Restrict"
+    Book |o--o{ Ticket : "subject of - SetNull"
+    User |o--o{ Ticket : "assignee - SetNull"
+    Ticket ||--o{ TicketMessage : "has - Cascade"
+    Ticket ||--o{ InternalNote : "has - Cascade"
+    Ticket ||--o{ TicketAssignment : "history - Cascade"
+    Ticket ||--o{ TicketAttachment : "has - Cascade"
+    User ||--o{ TicketMessage : "writes - Restrict"
+    User ||--o{ InternalNote : "writes - Restrict"
+    User |o--o{ TicketAssignment : "assignee - SetNull"
+    User ||--o{ TicketAssignment : "assigned by - Restrict"
+    User ||--o{ TicketAttachment : "uploads - Restrict"
+    Ticket {
+        string id PK
+        string authorId FK
+        string bookId FK
+        string subject
+        TicketStatus status
+        TicketCategory category
+        TicketPriority priority
+        string assigneeId FK
+    }
+    TicketMessage {
+        string id PK
+        string ticketId FK
+        string authorId FK
+        MessageVisibility visibility
+    }
+    InternalNote {
+        string id PK
+        string ticketId FK
+        string authorId FK
+    }
+    TicketAssignment {
+        string id PK
+        string ticketId FK
+        string assigneeId FK
+        string assignedById FK
+    }
+    TicketAttachment {
+        string id PK
+        string ticketId FK
+        string uploaderId FK
+        string storageKey UK
+        string sha256
+    }

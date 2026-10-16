@@ -1,0 +1,22 @@
+%% file: attachment-lifecycle.mmd
+flowchart TB
+    S["Author selects file on NewTicketPage"] --> C1{"Client checks<br/>non-empty, at most 5 MB,<br/>allowed type"}
+    C1 -- "fail" --> X1["Inline error, nothing sent"]
+    C1 -- "pass" --> U["POST /author/tickets/:id/attachments?filename=...<br/>raw bytes, Content-Type = file type"]
+    U --> G1{"Session + CSRF OK?<br/>role AUTHOR?"}
+    G1 -- "no" --> X2["401 / 403"]
+    G1 -- "yes" --> G2{"Ticket exists and is owned by caller?"}
+    G2 -- "no" --> X3["404 (same for foreign tickets)"]
+    G2 -- "yes" --> G3{"Ticket status CLOSED?"}
+    G3 -- "yes" --> X4["409 Closed tickets cannot receive attachments"]
+    G3 -- "no" --> V{"Server validation<br/>type in allow-list, filename sanitised,<br/>non-empty, size within limit,<br/>magic bytes match declared type"}
+    V -- "fail" --> X5["400 VALIDATION_ERROR"]
+    V -- "pass" --> W["Write bytes to ATTACHMENT_DIR/storageKey<br/>48 hex chars, mode 0600, never overwrite"]
+    W --> T["Transaction: lock ticket row,<br/>count attachments"]
+    T --> L{"Already 5 attachments?"}
+    L -- "yes" --> R["Rollback, delete the file, 409"]
+    L -- "no" --> I["INSERT TicketAttachment<br/>metadata + sha256"]
+    I --> OK["201 attachment metadata (no storage key)"]
+    OK --> LIST["Listed: GET .../attachments (author own, admin any)"]
+    LIST --> DL["Download: GET .../attachments/:id<br/>Content-Disposition attachment, nosniff,<br/>CSP default-src 'none'; sandbox"]
+    DL --> END["Bytes kept on the volume for the life of the ticket"]

@@ -1,0 +1,9 @@
+# Reviewer guide
+
+1. **Honesty first.** `docs/release/01-CURRENT-STATE.md` states what was run and what was not. Real OpenRouter inference is verified **with limits** (see `docs/release/AI_REAL_PROVIDER.md`: classification 6/6, drafts accepted 12/13 in local runs on the default free model); on the deployed site the free daily quota was exhausted during acceptance, so live real-AI results are pending (`docs/release/DEPLOYMENT_RECORD.md`). The automated suites use mock providers. The site runs the real provider; a failed real call is shown as an error, never replaced by mock output.
+2. **Read the code in this order:** `packages/contracts/src/index.ts` (shared Zod schemas), `packages/db/prisma/schema.prisma`, `apps/api/src/{auth,tickets,attachments,events,ai}`, `packages/ai/src` (classifier, drafter, safety, grounding, provider), `apps/web/src`.
+3. **Security to try:** log in as one author and request another author's ticket id (expect 404, identical to a missing one); call a state-changing endpoint without `X-CSRF-Token` (403); send `<script>` in a ticket body (rendered as text); upload a disguised file type (rejected).
+4. **AI to try:** open a ticket as admin, read the analysis (category, priority, rationale, cited policy chunks, draft), edit the draft, send it as a normal reply. A rationale that begins "[Rule-based fallback" means the model output was not usable and templates were used.
+5. **Tests:** see TEST_RESULTS.md.
+6. **Live-provider test:** `node tests/live/ai-real.mjs` after placing a key in `infra/.env` (see `docs/release/AI_REAL_PROVIDER.md`).
+7. **Sample data and logins:** ten sample author accounts (the assignment's original `AUTH001`-`AUTH010`, 18 books) and one admin are in the separate credentials handoff, not in the repository. You do not need an OpenRouter key to use the live demo. To run your own copy with your own key see `docs/ENVIRONMENT.md` (reviewer setup).

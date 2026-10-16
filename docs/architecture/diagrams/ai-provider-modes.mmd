@@ -1,0 +1,20 @@
+%% file: ai-provider-modes.mmd
+flowchart LR
+    subgraph API["api container"]
+        SVC["@bookleaf/ai<br/>loadAiConfig()"]
+        GUARD{"base URL is loopback?"}
+        FREE{"model and fallback end with ':free'?"}
+        DEFAULT["Default model:<br/>nvidia/nemotron-3-super-120b-a12b:free"]
+    end
+    KEY[/"OPENROUTER_API_KEY<br/>server-side env only (infra/.env, mode 600)"/]
+    OR(["openrouter.ai/api/v1<br/>free endpoint, price 0"])
+    subgraph DEMO["OPTIONAL: demo only"]
+        MOCK["mock-ai on 127.0.0.1:8080<br/>canned [DEMO MOCK] text, no inference<br/>needs docker-compose.demo.yml<br/>and MOCK_AI_ACK=demonstration-only<br/>runs inside the api container"]
+    end
+    KEY --> SVC
+    DEFAULT --> SVC
+    SVC --> GUARD
+    GUARD -- "no (real provider)" --> FREE
+    FREE -- "yes" --> OR
+    FREE -- "no: AI_NOT_CONFIGURED, no request sent" --> STOP(["Attempt FAILED"])
+    GUARD -- "yes, only when demo override is applied" --> MOCK

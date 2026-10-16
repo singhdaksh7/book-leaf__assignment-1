@@ -56,6 +56,7 @@ model User {
   auditLogs AuditLog[] @relation("AuditActor")
   assignmentsMade TicketAssignment[] @relation("AssignmentActor")
   assignmentsReceived TicketAssignment[] @relation("AssignmentAssignee")
+  attachments TicketAttachment[] @relation("AttachmentUploader")
 }
 
 model AuthorProfile {
@@ -69,6 +70,7 @@ model AuthorProfile {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   books Book[]
   tickets Ticket[]
+  @@index([name])
 }
 
 model Book {
@@ -91,6 +93,7 @@ model Book {
   availableOn String[]
   author AuthorProfile @relation(fields: [authorId], references: [id], onDelete: Restrict)
   tickets Ticket[]
+  @@index([authorId])
 }
 
 model Session {
@@ -100,6 +103,8 @@ model Session {
   expiresAt DateTime
   createdAt DateTime @default(now())
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model Ticket {
@@ -121,6 +126,13 @@ model Ticket {
   internalNotes InternalNote[]
   assignments TicketAssignment[]
   aiAnalyses AiAnalysis[]
+  attachments TicketAttachment[]
+  @@index([authorId, createdAt])
+  @@index([bookId])
+  @@index([assigneeId])
+  @@index([status, priority, createdAt])
+  @@index([category])
+  @@index([createdAt])
 }
 
 model TicketMessage {
@@ -132,6 +144,7 @@ model TicketMessage {
   createdAt DateTime @default(now())
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   author User @relation("MessageAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  @@index([ticketId, createdAt])
 }
 
 model InternalNote {
@@ -142,6 +155,7 @@ model InternalNote {
   createdAt DateTime @default(now())
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   author User @relation("NoteAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  @@index([ticketId, createdAt])
 }
 
 model TicketAssignment {
@@ -153,6 +167,7 @@ model TicketAssignment {
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
   assignee User? @relation("AssignmentAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
   assignedBy User @relation("AssignmentActor", fields: [assignedById], references: [id], onDelete: Restrict)
+  @@index([ticketId, createdAt])
 }
 
 model AiAnalysis {
@@ -177,6 +192,8 @@ model AiAnalysis {
   errorCode String?
   createdAt DateTime @default(now())
   ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  @@index([ticketId, createdAt, id])
+  @@index([status, createdAt])
 }
 
 model AuditLog {
@@ -190,4 +207,24 @@ model AuditLog {
   requestId String?
   createdAt DateTime @default(now())
   actor User? @relation("AuditActor", fields: [actorId], references: [id], onDelete: SetNull)
+  @@index([entityType, entityId, createdAt])
+  @@index([actorId, createdAt])
+}
+
+model TicketAttachment {
+  id String @id @default(cuid())
+  ticketId String
+  uploaderId String
+  // Sanitised display name only; never used to build a storage path.
+  fileName String
+  contentType String
+  sizeBytes Int
+  // Opaque server-generated storage key (not derived from user input).
+  storageKey String @unique
+  sha256 String
+  createdAt DateTime @default(now())
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  uploader User @relation("AttachmentUploader", fields: [uploaderId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId, createdAt])
 }

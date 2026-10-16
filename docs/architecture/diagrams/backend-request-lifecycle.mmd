@@ -1,0 +1,30 @@
+%% file: backend-request-lifecycle.mmd
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant T as Traefik
+    participant A as Express app
+    participant MW as Middleware (auth, CSRF)
+    participant R as Route handler
+    participant P as Prisma / PostgreSQL
+    participant E as Error handler
+
+    B->>T: HTTPS request with session cookie (and X-CSRF-Token if mutating)
+    T->>A: HTTP :3000 (X-Forwarded-* headers, trust proxy = 1)
+    A->>A: assign X-Request-Id, start access-log timer
+    A->>A: helmet, CORS check, parse JSON (max 100 kB), parse cookies
+    A->>MW: noStore, authenticate
+    MW->>P: find Session by SHA-256(cookie token) with user and profile
+    P-->>MW: session or none (expired = none)
+    MW->>MW: csrfProtection (skipped for GET/HEAD/OPTIONS and anonymous)
+    MW->>R: requireAuthor or requireRole(ADMIN)
+    R->>R: parseInput(Zod schema) for body, query
+    R->>P: transaction: SELECT ... FOR UPDATE, write rows, write AuditLog
+    P-->>R: committed rows
+    R->>R: publish SSE event after commit
+    R->>R: serialize to DTO and parse with contract schema
+    R-->>A: res.status(...).json(...)
+    A-->>T: response (+ X-Request-Id)
+    T-->>B: HTTPS response
+    A->>A: on finish: log method, path, status, duration, userId
+    Note over R,E: Any thrown AppError or unexpected error goes to the error handler,<br/>which returns {error:{code,message,details?,requestId}} and logs only the error class name

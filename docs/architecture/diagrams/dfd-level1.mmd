@@ -1,0 +1,43 @@
+%% file: dfd-level1.mmd
+flowchart TB
+    AU(["Author"])
+    AD(["Administrator"])
+    OR(["OpenRouter"])
+
+    P1(("1<br/>Authenticate<br/>and authorise"))
+    P2(("2<br/>Manage own<br/>tickets"))
+    P3(("3<br/>Triage and<br/>reply"))
+    P4(("4<br/>AI analysis"))
+    P5(("5<br/>Attachments"))
+    P6(("6<br/>Live events"))
+
+    D1[("D1 User, AuthorProfile,<br/>Session")]
+    D2[("D2 Book")]
+    D3[("D3 Ticket,<br/>TicketMessage")]
+    D4[("D4 InternalNote,<br/>TicketAssignment,<br/>AuditLog")]
+    D5[("D5 AiAnalysis")]
+    D6[("D6 Attachment files<br/>+ TicketAttachment")]
+
+    AU -- "login" --> P1
+    AD -- "login" --> P1
+    P1 <--> D1
+    AU -- "new ticket, reply" --> P2
+    P2 <--> D3
+    P2 -- "book lookup, ownership check" --> D2
+    P2 -- "enqueue analysis" --> P4
+    AD -- "status, priority, reply, note, assignment" --> P3
+    P3 <--> D3
+    P3 --> D4
+    AD -- "request / re-run analysis" --> P4
+    P4 -- "minimised input" --> OR
+    OR -- "JSON output" --> P4
+    P4 --> D5
+    D5 -- "analysis and draft (admin only)" --> P3
+    AU -- "upload, download" --> P5
+    AD -- "download" --> P5
+    P5 <--> D6
+    P2 -- "events" --> P6
+    P3 -- "events" --> P6
+    P4 -- "events" --> P6
+    P6 -- "SSE (own tickets only for authors)" --> AU
+    P6 -- "SSE (all tickets)" --> AD

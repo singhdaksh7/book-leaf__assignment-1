@@ -1,0 +1,29 @@
+%% file: database-erd-simplified.mmd
+erDiagram
+    USER ||--o| AUTHOR_PROFILE : "is"
+    USER ||--o{ SESSION : "logs in with"
+    AUTHOR_PROFILE ||--o{ BOOK : "publishes"
+    AUTHOR_PROFILE ||--o{ TICKET : "raises"
+    BOOK |o--o{ TICKET : "is about"
+    USER |o--o{ TICKET : "is assigned"
+    TICKET ||--o{ TICKET_MESSAGE : "contains"
+    TICKET ||--o{ INTERNAL_NOTE : "annotated by"
+    TICKET ||--o{ TICKET_ASSIGNMENT : "history of"
+    TICKET ||--o{ AI_ANALYSIS : "analysed by"
+    TICKET ||--o{ TICKET_ATTACHMENT : "has"
+    USER ||--o{ TICKET_MESSAGE : "writes"
+    USER ||--o{ INTERNAL_NOTE : "writes"
+    USER ||--o{ TICKET_ATTACHMENT : "uploads"
+    USER |o--o{ AUDIT_LOG : "performs"
+
+    USER { string id PK  string email  string role }
+    AUTHOR_PROFILE { string id PK  string name  string externalAuthorId }
+    BOOK { string id PK  string title  string status }
+    SESSION { string id PK  datetime expiresAt }
+    TICKET { string id PK  string subject  string status  string category  string priority }
+    TICKET_MESSAGE { string id PK  string body  string visibility }
+    INTERNAL_NOTE { string id PK  string body }
+    TICKET_ASSIGNMENT { string id PK  datetime createdAt }
+    AI_ANALYSIS { string id PK  string status  string draftResponse }
+    TICKET_ATTACHMENT { string id PK  string fileName  int sizeBytes }
+    AUDIT_LOG { string id PK  string action  string entityType }

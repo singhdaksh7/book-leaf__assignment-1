@@ -1,0 +1,37 @@
+%% file: dfd-level2-ticket.mmd
+flowchart TB
+    AU(["Author"])
+    AD(["Administrator"])
+    V["2.1 Validate input<br/>(Zod, CSRF, Origin, rate limit)"]
+    O["2.2 Check book ownership<br/>(SELECT ... FOR SHARE)"]
+    C["2.3 Create ticket and first message<br/>(one transaction)"]
+    A["2.4 Enqueue AI attempt<br/>(same transaction)"]
+    R["2.5 Store author reply<br/>(rejected if CLOSED)"]
+    Q["3.1 List and filter queue<br/>(paginated)"]
+    S["3.2 Change status / category / priority<br/>(CLOSED is terminal)"]
+    RP["3.3 Store admin reply<br/>(visibility AUTHOR)"]
+    N["3.4 Store internal note<br/>(visibility ADMIN)"]
+    AS["3.5 Assign to self"]
+    D3[("Ticket,<br/>TicketMessage")]
+    D2[("Book")]
+    D4[("InternalNote,<br/>TicketAssignment,<br/>AuditLog")]
+    EV["Event hub"]
+    AU -- "subject, description, bookId" --> V --> O
+    O -- "book row" --> D2
+    O --> C --> D3
+    C --> A
+    AU -- "reply body" --> R --> D3
+    AD --> Q
+    Q -- "filters" --> D3
+    AD -- "status, category" --> S --> D3
+    AD -- "reply text" --> RP --> D3
+    AD -- "note" --> N --> D4
+    AD -- "self" --> AS --> D4
+    S --> D4
+    C --> EV
+    R --> EV
+    S --> EV
+    RP --> EV
+    N --> EV
+    EV -- "own tickets" --> AU
+    EV -- "all tickets" --> AD

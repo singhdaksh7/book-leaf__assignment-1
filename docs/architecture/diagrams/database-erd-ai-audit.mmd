@@ -1,0 +1,34 @@
+%% file: database-erd-ai-audit.mmd
+erDiagram
+    Ticket ||--o{ AiAnalysis : "attempts - Cascade"
+    User |o--o{ AuditLog : "actor - SetNull"
+    Ticket ||--o{ AuditLog : "entityType+entityId (logical, no FK)"
+    Ticket {
+        string id PK
+        TicketStatus status
+    }
+    AiAnalysis {
+        string id PK
+        string ticketId FK
+        AiAnalysisStatus status
+        string promptVersion
+        TicketCategory category
+        TicketPriority priority
+        float confidence
+        string draftResponse
+        json citations
+        string errorCode
+    }
+    AuditLog {
+        string id PK
+        string actorId FK
+        string action
+        string entityType
+        string entityId
+        json before
+        json after
+        string requestId
+    }
+    User {
+        string id PK
+    }

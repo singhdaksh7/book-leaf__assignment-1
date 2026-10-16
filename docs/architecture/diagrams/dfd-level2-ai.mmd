@@ -1,0 +1,30 @@
+%% file: dfd-level2-ai.mmd
+flowchart TB
+    T[("Ticket, last 2<br/>author-visible messages,<br/>Book")]
+    KB[("Built-in knowledge base<br/>(static policy chunks)")]
+    OR(["OpenRouter<br/>free model"])
+    ADM(["Administrator"])
+    D5[("AiAnalysis")]
+    EV["Event hub (admin audience)"]
+    I1["4.1 Single-flight attempt<br/>(one PENDING row per ticket)"]
+    I2["4.2 Build minimised input<br/>(no e-mail, phone, name, finances)"]
+    I3["4.3 Sanitise and redact<br/>untrusted boundary, injection flags"]
+    I4["4.4 Retrieve policy chunks"]
+    I5["4.5 Classify (call 1)"]
+    I6["4.6 Draft (call 2)"]
+    I7["4.7 Validate output<br/>schema, citations, grounding"]
+    I8["4.8 Decide result<br/>MODEL / PARTIAL fallback / FAILED"]
+    T --> I1 --> I2 --> I3 --> I4
+    KB --> I4
+    I4 --> I5
+    I5 -- "prompt" --> OR
+    OR -- "JSON" --> I5
+    I5 --> I6
+    I6 -- "prompt" --> OR
+    OR -- "JSON" --> I6
+    I5 --> I7
+    I6 --> I7 --> I8 --> D5
+    I8 -. "provider errors surface as FAILED with errorCode;<br/>no mock substitution" .-> D5
+    I8 --> EV
+    D5 -- "analysis + draft" --> ADM
+    ADM -- "edits, then explicitly sends a reply (separate request)" --> T

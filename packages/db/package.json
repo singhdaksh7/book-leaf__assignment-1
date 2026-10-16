@@ -5,14 +5,27 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./password": { "types": "./dist/password.d.ts", "import": "./dist/password.js" },
+    "./seed": { "types": "./dist/seed/index.d.ts", "import": "./dist/seed/index.js" },
+    "./cleanup": { "types": "./dist/cleanup/index.d.ts", "import": "./dist/cleanup/index.js" },
+    "./admin": { "types": "./dist/admin/index.d.ts", "import": "./dist/admin/index.js" },
+    "./synthetic": { "types": "./dist/synthetic.d.ts", "import": "./dist/synthetic.js" }
+  },
   "scripts": {
     "generate": "prisma generate",
     "build": "npm run generate && tsc -p tsconfig.json",
-    "typecheck": "npm run generate && tsc -p tsconfig.json --noEmit",
+    "typecheck": "npm run generate && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.seed.json --noEmit",
     "validate": "prisma validate",
-    "migrate:dev": "prisma migrate dev"
+    "migrate:dev": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:status": "prisma migrate status",
+    "seed": "tsx prisma/seed.ts",
+    "seed:synthetic": "tsx prisma/seed.ts --synthetic",
+    "cleanup:synthetic": "tsx prisma/cleanup.ts",
+    "admin:ensure": "tsx prisma/admin.ts"
   },
-  "dependencies": { "@prisma/client": "^6.4.1" },
+  "dependencies": { "@prisma/client": "^6.4.1", "argon2": "^0.41.1", "zod": "^3.24.2" },
   "devDependencies": { "prisma": "^6.4.1", "tsx": "^4.19.3" }
 }

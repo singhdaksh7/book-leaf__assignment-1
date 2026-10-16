@@ -1,0 +1,9 @@
+%% file: release-flow.mmd
+flowchart LR
+    DEV["Workstation<br/>git checkout of a commit"] -->|"docker build<br/>infra/docker/api.Dockerfile<br/>infra/docker/web.Dockerfile"| IMG["images bookleaf-api:TAG<br/>bookleaf-web:TAG"]
+    IMG -->|"docker save | gzip | ssh | docker load"| SRV["VPS /opt/bookleaf/src/infra"]
+    DEV -->|"scp compose files + mock-ai/"| SRV
+    SRV --> BKP["scripts/backup.sh<br/>before any migration"]
+    BKP --> MIG["compose run --rm migrate<br/>prisma migrate deploy"]
+    MIG --> UP["compose up -d --no-build --no-deps api web"]
+    UP --> VER["verify: healthz, login, AI journey"]
