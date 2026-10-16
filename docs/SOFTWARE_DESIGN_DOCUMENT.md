@@ -8,7 +8,7 @@
 | Date | 2026-10-16 |
 | Status | Describes the implemented application. Items not implemented or not verified are stated as such. The registration release is implemented and tested locally but **not yet deployed**; production still runs the previous release |
 | Repository | private GitHub repository `singhdaksh7/book-leaf__assignment-1` |
-| Staging | https://bookleaf.77.37.45.177.sslip.io (runs API `83184cd` and web `134f49b` with the real OpenRouter provider; the free daily AI quota was exhausted during acceptance, see §16 and §21; it does not yet have self-registration, and its database still holds only synthetic records) |
+| Staging | https://bookleaf.77.37.45.177.sslip.io (runs API `3eb1aff` and web `12edd72` with the real OpenRouter provider and self-registration; the assignment's 10 authors and 18 books are imported (358 field comparisons against the original JSON, 0 mismatches) alongside older synthetic test records, which are inventoried but not deleted; the free daily AI quota was exhausted on 2026-10-16, so live AI analyses end with a visible rate-limit notice, see §16 and §21) |
 
 **Reading note.** Every statement describes code that exists in the repository. Where a capability was tested only with mocks, or not tested, the text says so. Detailed per-component documents are in `docs/architecture/`; this document summarises them and links the diagrams.
 
@@ -298,7 +298,7 @@ Deployment findings to act on: a host cron prunes unused Docker images older tha
 | Scaffold / infra | `node --test` | 9 / 12 passed |
 | Backup scripts | manual, disposable containers | passed (see §22) |
 | Real OpenRouter | `tests/live/ai-real.mjs`, `ai-real-failures.mjs` | classification 6/6; drafts accepted 12/13 on the final prompt; failure scenarios passed (see §16) |
-| Live staging scripts, mobile sweep | `tests/live/*` | not run in this session |
+| Live production checks | `tests/live/*` and ad-hoc scripts, 2026-10-16 | 10/10 original-author logins with exact book ids, cross-author read 404, author blocked from admin API, self-registration, ticket, admin note, override and reply, author receipt, internal note hidden (13/13); no AI calls (quota exhausted) |
 
 Regression tests were added for each fix made in this release (whitespace login e-mail, signed-in redirect from `/login`, fallback labelling, model-greeting handling, zero-spend guard). All automated AI tests use mock or scripted providers.
 
@@ -314,7 +314,7 @@ Regression tests were added for each fix made in this release (whitespace login 
 * Deferred defects: duplicate tickets on concurrent identical submissions; admin search covers the current page only; health endpoint is liveness-only; internal-note/assignment deletion not trigger-protected (needs a migration).
 * Not implemented: password reset, e-mail notifications, e-mail verification of new accounts, attachment deletion, server-side search.
 * Self-registered authors start with no books: there is no admin screen or API to link books to an account yet (done by a database operation), and registration reveals whether an address is already registered.
-* Registration is verified by automated tests only; it is not live until the release in `docs/release/REGISTRATION_RELEASE_PLAN.md` is deployed, and the production database still holds the synthetic records until the separately approved cleanup is run.
+* Registration is live and was exercised on the production site; the production database still holds older synthetic test records (inventory: `docs/release/CLEANUP_INVENTORY_2026-10-16.md`) until a separately approved cleanup is run.
 * Single API instance: login throttling, event hub and AI single-flight are per process.
 
 ## 25. Conclusion

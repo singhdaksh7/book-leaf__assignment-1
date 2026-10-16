@@ -8,6 +8,14 @@ A full-stack author support portal: authors register themselves, browse their bo
 
 **AI status, stated plainly:** classification, priority and policy-grounded drafts use real OpenRouter calls (model `nvidia/nemotron-3-super-120b-a12b:free`, cost $0). Locally this was verified on the final code: 6/6 categories and priorities correct, 5/6 model drafts accepted (the sixth falls back to a labelled policy template). On the live site the free daily quota was exhausted, so live analyses currently end `AI_RATE_LIMITED` and admins reply manually; no successful live inference is claimed. A reviewer does **not** need a key for the hosted demo; to run your own copy, put `OPENROUTER_API_KEY` (and optionally `OPENROUTER_MODEL`, `:free` ids only) in the server-side environment, see [docs/ENVIRONMENT.md](docs/ENVIRONMENT.md).
 
+## Reviewer quick start
+
+1. Open https://bookleaf.77.37.45.177.sslip.io. Credentials come in the separate handoff file (not in this repository): ten author logins (`AUTH001`-`AUTH010`, the assignment's 10 authors and 18 books `BK001`-`BK018`) and one admin.
+2. **Author portal:** sign in as any author (for example Priya Sharma, `AUTH001`, books `BK001` and `BK002`). Check Dashboard and My Books (exact royalty figures, `BK002` has nothing pending; `BK013` (Sneha Kulkarni, `AUTH007`, Cover Design) and `BK015` (Kavita Deshmukh, `AUTH009`, Typesetting) are still in production with zero royalty), open a book, then raise a general or book-linked ticket with an attachment. Each author sees only their own books and tickets. You can also register a brand-new author at `/register`.
+3. **Admin portal:** sign in as the admin, open the ticket queue (search, filters, category, priority), open your ticket, assign it, add an internal note, change the status, reply, and watch the reply appear on the author side without refreshing.
+4. **AI:** the "AI analysis" panel classifies, scores priority and drafts a reply for the admin to edit and send. On the live site the free OpenRouter daily quota is exhausted at the time of writing, so analysis shows a clear rate-limit notice and replies are written manually (manual reply always works). The AI path is covered by tests and by real local runs; see the AI status paragraph above.
+5. The admin queue also contains older synthetic test tickets (inventory: `docs/release/CLEANUP_INVENTORY_2026-10-16.md`); they are labelled by the test data and were left in place deliberately.
+
 ## Architecture
 
 npm-workspace monorepo: TypeScript, React/Vite, Express, PostgreSQL/Prisma, Zod. See [Architecture](docs/ARCHITECTURE.md).

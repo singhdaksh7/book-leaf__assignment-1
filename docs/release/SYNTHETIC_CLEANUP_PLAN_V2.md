@@ -16,7 +16,7 @@ dataset and the cleanup can be done last, or never.
 
 ## Steps (when approved)
 1. Re-run the read-only inventory and compare with `FINAL_CLEANUP_INVENTORY.md` (counts have grown: tickets 150 -> 163).
-2. Confirm the original dataset import is present and verified (302 field comparisons, 0 mismatches).
+2. Confirm the original dataset import is present and verified (358 field comparisons, 0 mismatches).
 3. `./scripts/backup.sh`, then `restore-test.sh` against the new backup; record the stamp.
 4. Dry run inside the API container (`docker compose --profile tools run --rm ...`); review the counts: authors 10, books 18,
    tickets only from `SYN-*` authors, and **0** rows touching `AUTH*`/`BK*`/admin.

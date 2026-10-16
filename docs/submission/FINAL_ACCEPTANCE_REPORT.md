@@ -1,6 +1,6 @@
 # Final release acceptance report
 
-**Status: NOT READY FOR SUBMISSION. The registration release is implemented and verified locally only. Four gates are open (marked PENDING): (1) deploying the registration release and verifying it live, (2) running the data cleanup on production after the owner has seen the dry run, (3) real AI on the live site after the OpenRouter free quota resets (2026-10-17 00:00 UTC), (4) the first scheduled backup (2026-10-17 02:30 UTC). Do not treat this report as final, and do not submit, until each PENDING row holds an observed result.**
+**Status: READY WITH DISCLOSED LIMITATIONS (final re-verification 2026-10-16, see the last section).** The earlier PENDING markers below are historical; the last section supersedes them. The one open item is real AI on the live site, blocked by the provider's free daily quota until 2026-10-17 00:00 UTC.
 
 ## Release identity
 
@@ -59,7 +59,18 @@ Server-side sessions with HttpOnly, Secure, SameSite cookies; CSRF tokens; origi
 ## Final status 2026-10-16 (supersedes any PENDING item above)
 
 * **Deployed:** API `bookleaf-api:3eb1aff`, web `12edd72`; rollback image `12edd72` retained; verified backups `20261016T080326Z` and `20261016T081004Z` taken before the release and the dataset import.
-* **Dataset:** the assignment's 10 authors and 18 books are imported alongside the older synthetic records (nothing deleted): 302 field comparisons, 0 mismatches; 10/10 logins; My Books counts and ids exact; cross-author read 404.
+* **Dataset:** the assignment's 10 authors and 18 books are imported alongside the older synthetic records (nothing deleted): 358 field comparisons, 0 mismatches; 10/10 logins; My Books counts and ids exact; cross-author read 404.
 * **Admin/author workflow (live):** admin reply visible to the author after the explicit send, internal note hidden, status updated.
 * **Real AI:** verified locally on the final code (classification/priority 6/6, model drafts 5/6, cost $0). **Live: quota-blocked** (`AI_RATE_LIMITED` for six analyses on 2026-10-16); no successful live inference is claimed.
 * **Not done (by decision):** synthetic-data cleanup, admin password rotation, merge to `main`.
+
+## Final re-verification 2026-10-16 (evidence from this pass, supersedes everything above)
+
+* **Dataset parity:** production `AuthorProfile`/`User`/`Book` rows compared with the original JSON field by field: 10 authors, 18 books, 358 comparisons (author fields, role, book-to-author link, every book field), 0 mismatches. Source royalties reconcile (earned = paid + pending = copies x per-copy). Statuses: 16 Published & Live, 1 In Production - Cover Design, 1 In Production - Typesetting. Production holds 36 books in total (18 original + 18 older synthetic).
+* **Logins and isolation (live):** 10/10 original authors log in, each sees exactly their own `BK` ids, cross-author book read 404, authors get 401/403 on the admin API, admin login and queue (169 tickets) work, wrong password 401, foreign Origin rejected: 45/45 checks.
+* **Ticket flow (live):** a newly self-registered author (starts with 0 books) created a ticket; admin added an internal note, overrode status/category/priority, replied; the author received the reply and the new status; the internal note was not visible to the author; author blocked from the admin API: 13/13.
+* **Automated:** typecheck clean; build clean; AI 509, API 292, web 68, infra 12, scaffold 9 passed; Playwright E2E 41/41 (Chrome via `E2E_CHROMIUM_PATH`; the first attempt failed only because Playwright's own Chromium was not installed on this machine).
+* **Bundle and headers:** the served JS bundle is identical to the local build; it contains no key or OpenRouter variable names; HSTS, CSP, nosniff and frame-deny headers present; HTTP redirects to HTTPS.
+* **Backup and rollback:** fresh encrypted backup `20261016T095733Z` taken after the import and restored in an isolated container (12 tables; users 24, authors 23, books 36, tickets 169, attachments 50; matches live). Attachments: 50 rows, 50 files on the volume. Rollback image `bookleaf-api:12edd72` present. All 16 containers still running; no other project touched.
+* **AI quota:** the OpenRouter `/key` endpoint reports `free_model_daily_requests` 62 used of 50 (0 remaining), account credits 0. No inference calls were made in this pass. Live AI remains **BLOCKED**, not passed. Procedure: `docs/release/API_KEY_ROTATION.md`.
+* **Not done by decision:** synthetic-data cleanup (inventory: `docs/release/CLEANUP_INVENTORY_2026-10-16.md`), admin password rotation, merge to `main`, off-host backup.
